@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "stm32f401re",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "~/Desktop/EmbeddedDrivers/coresys/includes"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-arm"
+        }
+    ],
+    "version": 4
+}
