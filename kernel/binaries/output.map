@@ -1,0 +1,184 @@
+
+Discarded input sections
+
+ .data          0x00000000        0x0 binaries/main.o
+ .comment       0x00000000       0x46 binaries/main.o
+ .ARM.attributes
+                0x00000000       0x34 binaries/main.o
+ .data          0x00000000        0x0 binaries/startup.o
+ .bss           0x00000000        0x0 binaries/startup.o
+ .comment       0x00000000       0x46 binaries/startup.o
+ .ARM.attributes
+                0x00000000       0x34 binaries/startup.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00080000         xr
+SRAM             0x20000000         0x00018000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD binaries/main.o
+LOAD binaries/startup.o
+                0x00000400                        __max_heap_size = 0x400
+                0x00000200                        __max_stack_size = 0x200
+
+.isr_vector     0x08000000      0x150
+                0x08000000                        . = ALIGN (0x4)
+ *(.isr_vector)
+ .isr_vector    0x08000000      0x150 binaries/startup.o
+                0x08000000                vectors
+                0x08000150                        . = ALIGN (0x4)
+
+.text           0x08000150       0xe0
+                0x08000150                        . = ALIGN (0x4)
+ *(.text)
+ .text          0x08000150       0x4c binaries/main.o
+                0x08000150                setup_systick
+                0x08000174                SysTick_handler
+                0x08000184                has_time_passed
+ .text          0x0800019c       0x8c binaries/startup.o
+                0x0800019c                EXTI15_10_handler
+                0x0800019c                DMA1_Stream7_handler
+                0x0800019c                USART1_handler
+                0x0800019c                TIM1_UP_TIM10_handler
+                0x0800019c                EXTI0_handler
+                0x0800019c                DMA1_Stream1_handler
+                0x0800019c                SDIO_handler
+                0x0800019c                NMI_handler
+                0x0800019c                DMA2_Stream3_handler
+                0x0800019c                TIM2_handler
+                0x0800019c                USART2_handler
+                0x0800019c                PVD_EXTI16_handler
+                0x0800019c                SPI3_handler
+                0x0800019c                TIM3_handler
+                0x0800019c                WWDG_handler
+                0x0800019c                default_handler
+                0x0800019c                SPI2_handler
+                0x0800019c                SVCall_handler
+                0x0800019c                DMA2_Stream6_handler
+                0x0800019c                DebugMonitor_handler
+                0x0800019c                I2C3_ER_handler
+                0x0800019c                DMA1_Stream3_handler
+                0x0800019c                MemManage_handler
+                0x0800019c                EXTI9_5_handler
+                0x0800019c                SPI4_handler
+                0x0800019c                HardFault_handler
+                0x0800019c                DMA1_Stream5_handler
+                0x0800019c                FPU_handler
+                0x0800019c                DMA2_Stream5_handler
+                0x0800019c                RCC_handler
+                0x0800019c                EXTI2_handler
+                0x0800019c                DMA2_Stream1_handler
+                0x0800019c                I2C1_ER_handler
+                0x0800019c                I2C2_EV_handler
+                0x0800019c                RTC_WKUP_EXTI22_handler
+                0x0800019c                EXTI3_handler
+                0x0800019c                DMA2_Stream0_handler
+                0x0800019c                FLASH_handler
+                0x0800019c                TAMP_STAMP_EXTI21_handler
+                0x0800019c                OTG_FS_handler
+                0x0800019c                DMA1_Stream4_handler
+                0x0800019c                I2C2_ER_handler
+                0x0800019c                TIM1_BRK_TIM9_handler
+                0x0800019c                USART6_handler
+                0x0800019c                TIM4_handler
+                0x0800019c                DMA1_Stream2_handler
+                0x0800019c                EXTI4_handler
+                0x0800019c                DMA1_Stream6_handler
+                0x0800019c                ADC_handler
+                0x0800019c                I2C1_EV_handler
+                0x0800019c                SPI1_handler
+                0x0800019c                OTG_FS_WKUP_EXTI18_handler
+                0x0800019c                DMA2_Stream4_handler
+                0x0800019c                PendSV_handler
+                0x0800019c                DMA2_Stream7_handler
+                0x0800019c                UsageFault_handler
+                0x0800019c                DMA1_Stream0_handler
+                0x0800019c                DMA2_Stream2_handler
+                0x0800019c                EXTI1_handler
+                0x0800019c                TIM1_TRG_COM_TIM11_handler
+                0x0800019c                TIM5_handler
+                0x0800019c                RTC_Alarm_EXTI17_handler
+                0x0800019c                I2C3_EV_handler
+                0x0800019c                BusFault_handler
+                0x0800019c                TIM1_CC_handler
+                0x080001a0                enable_fpu
+                0x080001b4                reset_handler
+                0x08000204                system_reset
+ *(.text*)
+ .text.startup  0x08000228        0x8 binaries/main.o
+                0x08000228                main
+ *(.rodata)
+ *(.rodata*)
+                0x08000230                        . = ALIGN (0x4)
+                0x08000230                        _etext = .
+                0x08000230                        _sidata = LOADADDR (.data)
+
+.glue_7         0x08000230        0x0
+ .glue_7        0x08000230        0x0 linker stubs
+
+.glue_7t        0x08000230        0x0
+ .glue_7t       0x08000230        0x0 linker stubs
+
+.vfp11_veneer   0x08000230        0x0
+ .vfp11_veneer  0x08000230        0x0 linker stubs
+
+.v4_bx          0x08000230        0x0
+ .v4_bx         0x08000230        0x0 linker stubs
+
+.iplt           0x08000230        0x0
+ .iplt          0x08000230        0x0 binaries/main.o
+
+.rel.dyn        0x08000230        0x0
+ .rel.iplt      0x08000230        0x0 binaries/main.o
+
+.data           0x20000000        0x0 load address 0x08000230
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _sdata = .
+ *(.data)
+ *(.data*)
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _edata = .
+
+.igot.plt       0x20000000        0x0 load address 0x08000230
+ .igot.plt      0x20000000        0x0 binaries/main.o
+
+.bss            0x20000000        0x4 load address 0x08000230
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        __bss_start__ = .
+ *(.bss)
+ .bss           0x20000000        0x4 binaries/main.o
+                0x20000000                tick_count
+ *(.bss*)
+ *(COMMON)
+                0x20000004                        . = ALIGN (0x4)
+                0x20000004                        __bss_end__ = .
+
+.heap           0x20000004      0x404 load address 0x08000230
+                0x20000008                        . = ALIGN (0x8)
+ *fill*         0x20000004        0x4 
+                0x20000008                        _heap_start = .
+                0x20000408                        . = (. + __max_heap_size)
+ *fill*         0x20000008      0x400 
+                0x20000408                        . = ALIGN (0x8)
+                0x20000408                        _heap_end = .
+                0x20000408                        _end = .
+
+.stack          0x20000408      0x200 load address 0x08000230
+                0x20000408                        . = ALIGN (0x8)
+                0x20000408                        _stack_start = .
+                0x20000608                        . = (. + __max_stack_size)
+ *fill*         0x20000408      0x200 
+                0x20000608                        . = ALIGN (0x8)
+                0x20000608                        _stack_end = .
+
+/DISCARD/
+ *(.comment)
+ *(.ARM.attributes)
+ *(.note.GNU-stack)
+                0x20018000                        _estack = (ORIGIN (SRAM) + LENGTH (SRAM))
+OUTPUT(binaries/output.elf elf32-littlearm)
+LOAD linker stubs
