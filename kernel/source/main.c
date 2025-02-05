@@ -15,7 +15,7 @@ neo_thread_t thread_two;
 
 bool has_run = false;
 
-__attribute__((naked)) void thread_handler(void)
+/* __attribute__((naked)) void thread_handler(void)
 {
     __asm__ volatile(
         "ldr r2, =has_run \n"
@@ -29,7 +29,7 @@ __attribute__((naked)) void thread_handler(void)
         "_exit_run: \n"
         "bx lr \n");
 }
-
+ */
 void thread_two_fxn(void *arg)
 {
     (int *)arg++;
@@ -37,7 +37,7 @@ void thread_two_fxn(void *arg)
     bool is_on = false;
     while (true)
     {
-        if (has_time_passed(100000, start))
+        if (has_time_passed(1000, start))
         {
             start = get_tick_count();
             if (is_on)
@@ -61,7 +61,7 @@ void thread_one_fxn(void *arg)
     bool is_on = false;
     while (true)
     {
-        if (has_time_passed(100, start))
+        if (has_time_passed(1000, start))
         {
             start = get_tick_count();
             if (is_on)
