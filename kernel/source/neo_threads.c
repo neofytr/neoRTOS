@@ -2,14 +2,51 @@
 #include "system_core.h"
 
 #define PROCESSOR_MODE_BIT (24U)
+#define MAX_THREADS (4U)       // must be a power of 2
+#define TIME_PER_THREAD (1000) // a thread runs for one second
 
+static volatile neo_thread_t *thread_queue[MAX_THREADS];
+static volatile int8_t thread_queue_index = 0;
+
+/* Ticks when the last thread was started */
+static volatile uint32_t last_thread_start_ticks;
+static volatile uint8_t running_thread_index;
+
+void thread_handler(void)
+{
+    if (TIME_PER_THREAD <= get_tick_count() - last_thread_start_ticks)
+    {
+        // Save current SP to thread queue
+        __asm__ volatile("str sp, [%0]"
+                         :
+                         : "r"(&thread_queue[running_thread_index]->stack_ptr)
+                         : "memory");
+
+        running_thread_index = (running_thread_index + 1) & (MAX_THREADS - 1);
+
+        // Restore SP from next thread
+        __asm__ volatile("ldr sp, [%0]"
+                         :
+                         : "r"(&thread_queue[running_thread_index]->stack_ptr)
+                         : "memory");
+        last_thread_start_ticks = get_tick_count();
+    }
+    return;
+}
 void init_neo()
 {
-
+    // sysclock_init()
+    setup_systick(1); // systick returns an interrupt every millisecond
 }
 
-void init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg)
+bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg)
 {
+    if (thread_queue_index >= MAX_THREADS)
+    {
+        return false;
+    }
+
+    thread_queue[thread_queue_index++] = thread;
     /*
      * Thread Stack Frame Initialization for ARM Cortex-M4
      * ------------------------------------------------

@@ -10,3 +10,4 @@ typedef struct
 
 void init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg);
 void init_neo();
+void thread_handler();

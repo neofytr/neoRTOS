@@ -69,3 +69,5 @@ void LED_setup(void);
  * @endcode
  */
 bool has_time_passed(uint32_t time, uint32_t start_tick_count);
+
+void thread_handler(void);

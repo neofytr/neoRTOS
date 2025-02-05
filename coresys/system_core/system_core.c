@@ -39,6 +39,7 @@ static volatile uint32_t tick_count;
 void SysTick_handler(void)
 {
     tick_count++;
+    thread_handler();
 }
 
 /**
@@ -49,7 +50,7 @@ void SysTick_handler(void)
  * This function provides thread-safe access to the tick counter by
  * temporarily disabling interrupts during the read operation.
  */
- uint32_t get_tick_count(void)
+uint32_t get_tick_count(void)
 {
     uint32_t curr_count;
     __disable_irq(); /* Disable interrupts for atomic operation */
@@ -65,7 +66,7 @@ void SysTick_handler(void)
  * 1. Enables GPIOA clock in AHB1 bus
  * 2. Sets PA5 to general purpose output mode (01)
  */
- void LED_setup(void)
+void LED_setup(void)
 {
     /* Enable GPIOA clock */
     SET_BIT(RCC->AHB1ENR, GPIOA_EN);
@@ -90,7 +91,7 @@ void SysTick_handler(void)
  * }
  * @endcode
  */
- bool has_time_passed(uint32_t time, uint32_t start_tick_count)
+bool has_time_passed(uint32_t time, uint32_t start_tick_count)
 {
     return (get_tick_count() - start_tick_count) >= time;
 }
@@ -126,6 +127,13 @@ void setup_systick(uint32_t systick_interrupt_period)
      */
     SysTick->LOAD = 0x00FFFFFF & (unsigned int)(systick_interrupt_period * SYS_CLOCK / 1000U - 1);
 }
+
+static inline void default_thread_handler(void)
+{
+    return;
+}
+
+__attribute__((weak, alias("default_thread_handler"))) void thread_handler(void);
 
 /* Undefine all local macros */
 #undef GPIOA_EN
