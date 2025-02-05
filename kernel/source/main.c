@@ -15,7 +15,7 @@ neo_thread_t thread_two;
 
 bool has_run = false;
 
-/* __attribute__((naked)) void thread_handler(void)
+__attribute__((naked)) void thread_handler(void)
 {
     __asm__ volatile(
         "ldr r2, =has_run \n"
@@ -29,7 +29,7 @@ bool has_run = false;
         "_exit_run: \n"
         "bx lr \n");
 }
- */
+
 void thread_two_fxn(void *arg)
 {
     (int *)arg++;

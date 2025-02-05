@@ -12,7 +12,7 @@ static volatile uint8_t thread_queue_index;
 static volatile uint8_t last_thread_start_ticks;
 static volatile uint8_t running_thread_index;
 
-__attribute__((naked)) void thread_handler(void)
+/* __attribute__((naked)) void thread_handler(void)
 {
     static bool first_thread_started = false;
 
@@ -52,7 +52,7 @@ __attribute__((naked)) void thread_handler(void)
     }
     __asm__ volatile("ldr lr, =0xFFFFFFF9");
     __asm__ volatile("bx lr \n");
-}
+} */
 
 bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg)
 {
