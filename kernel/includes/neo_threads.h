@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define STACK_SIZE (50U) // in words (32-bits)
+#define STACK_SIZE (100) // in words (32-bits)
 
 typedef struct
 {
