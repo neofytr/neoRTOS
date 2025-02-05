@@ -22,7 +22,7 @@ static volatile uint32_t tick_count = 0; // global tick counter; each tick measu
  *
  * @note The actual period might have slight deviation due to integer division
  */
-static inline void setup_systick(uint32_t systick_interrupt_period);
+void setup_systick(uint32_t systick_interrupt_period);
 
 /**
  * @brief Safely retrieve the current tick count
@@ -32,7 +32,7 @@ static inline void setup_systick(uint32_t systick_interrupt_period);
  * This function provides thread-safe access to the tick counter by
  * temporarily disabling interrupts during the read operation.
  */
-static inline uint32_t get_tick_count(void);
+uint32_t get_tick_count(void);
 
 /**
  * @brief SysTick interrupt handler
@@ -51,7 +51,7 @@ void SysTick_handler(void);
  * 1. Enables GPIOA clock in AHB1 bus
  * 2. Sets PA5 to general purpose output mode (01)
  */
-static inline void LED_setup(void);
+void LED_setup(void);
 
 /**
  * @brief Check if specified time has elapsed since start point
@@ -68,4 +68,4 @@ static inline void LED_setup(void);
  * }
  * @endcode
  */
-static inline bool has_time_passed(uint32_t time, uint32_t start_tick_count);
+bool has_time_passed(uint32_t time, uint32_t start_tick_count);

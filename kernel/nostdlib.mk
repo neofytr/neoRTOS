@@ -13,6 +13,7 @@ STM_INC_DIR = ../coresys/includes
 CORE_INC_DIR = ../coresys/includes/core
 STARTUP_DIR = $(CORESYS_DIR)/startup
 SYSCALL_DIR = $(CORESYS_DIR)/syscalls
+SYSTEM_CORE_DIR = $(CORESYS_DIR)/system_core
 LINKER_DIR = $(CORESYS_DIR)/linker_script
 GDB_CMDS_FILE = gdbcmds.txt
 OUTPUT_DIR = binaries
@@ -69,10 +70,12 @@ LDFLAGS = -T$(LINKER_DIR)/linker_script.ld \
 # Source files
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 STARTUP_SRC = $(STARTUP_DIR)/startup_nostdlib.c
+SYSTEM_CORE_SRC = $(SYSTEM_CORE_DIR)/system_core.c
 
 # Object files
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OUTPUT_DIR)/%.o)
 STARTUP_OBJ = $(OUTPUT_DIR)/startup.o
+SYSTEM_CORE_OBJ = $(OUTPUT_DIR)/system_core.o
 
 # Default target (release build)
 all: CFLAGS = $(RELEASE_FLAGS)
@@ -91,14 +94,17 @@ $(OUTPUT_DIR)/$(TARGET).asm: $(OUTPUT_DIR)/$(TARGET).elf
 	$(OBJDUMP) -D $< > $@
 
 # Linking object files
-$(OUTPUT_DIR)/$(TARGET).elf: $(OBJS) $(STARTUP_OBJ)
-	$(LD) $(OBJS) $(STARTUP_OBJ) $(LDFLAGS) -o $@
+$(OUTPUT_DIR)/$(TARGET).elf: $(OBJS) $(STARTUP_OBJ) $(SYSTEM_CORE_OBJ)
+	$(LD) $(OBJS) $(STARTUP_OBJ) $(SYSTEM_CORE_OBJ) $(LDFLAGS) -o $@
 
 # Compilation rules
 $(OUTPUT_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUT_DIR)/startup.o: $(STARTUP_DIR)/startup_nostdlib.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTPUT_DIR)/system_core.o: $(SYSTEM_CORE_DIR)/system_core.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Utility targets

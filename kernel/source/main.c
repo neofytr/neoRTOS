@@ -6,19 +6,11 @@
 
 /* This kernel works currently only without the floating-point hardware being enabled */
 
-#define SMALLEST_UNIT_OF_TIME_MEASURED (1000U)
-
 #define PIN5 5
-
-__attribute__((used)) void no_use(void)
-{
-    while (true)
-        ;
-}
 
 int main(void)
 {
-    setup_systick();
+    setup_systick(1);
     LED_setup();
     uint32_t start = get_tick_count();
     bool is_on = false;

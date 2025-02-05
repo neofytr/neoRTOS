@@ -1,6 +1,12 @@
 #include "neo_threads.h"
+#include "system_core.h"
 
 #define PROCESSOR_MODE_BIT (24U)
+
+void init_neo()
+{
+
+}
 
 void init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg)
 {
