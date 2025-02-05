@@ -3,6 +3,8 @@
 #include "STM32F401.h"
 #include "core_cm4.h"
 
+/* This kernel works currently only without the floating-point hardware being enabled */
+
 #define SET_BIT(reg, bit) ((reg) |= ((1UL) << (bit)))
 #define CLEAR_BIT(reg, bit) ((reg) &= ~((1UL) << (bit)))
 #define TOGGLE_BIT(reg, bit) ((reg) ^= ((1UL) << (bit)))
@@ -47,7 +49,22 @@ static inline uint32_t get_tick_count(void)
     return curr_count;
 }
 
-bool has_time_passed(uint32_t time, uint32_t start_tick_count)
+__attribute__((used)) void no_use(void)
+{
+    while (true)
+        ;
+}
+
+static inline void LED_setup(void)
+{
+#define GPIOA_EN (0U)
+#define PIN5 (5U)
+    SET_BIT(RCC->AHB1ENR, GPIOA_EN);
+    SET_BIT(GPIOA->MODER, PIN5 * 2);
+    CLEAR_BIT(GPIOA->MODER, PIN5 * 2 + 1);
+}
+
+static inline bool has_time_passed(uint32_t time, uint32_t start_tick_count)
 {
     // time is in miliseconds
     return (get_tick_count() - start_tick_count) >= time;
@@ -56,6 +73,24 @@ bool has_time_passed(uint32_t time, uint32_t start_tick_count)
 int main(void)
 {
     setup_systick();
+    LED_setup();
+    uint32_t start = get_tick_count();
+    bool is_on = false;
     while (true)
-        ;
+    {
+        if (has_time_passed(1000, start))
+        {
+            start = get_tick_count();
+            if (is_on)
+            {
+                SET_BIT(GPIOA->BSRR, PIN5 + 16U);
+                is_on = false;
+            }
+            else
+            {
+                SET_BIT(GPIOA->BSRR, PIN5);
+                is_on = true;
+            }
+        }
+    }
 }
