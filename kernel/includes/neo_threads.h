@@ -8,4 +8,4 @@ typedef struct
     uint8_t *stack_ptr;
 } neo_thread_t;
 
-void init_thread(neo_thread_t *thread);
+void init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg);

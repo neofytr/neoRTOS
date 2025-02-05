@@ -3,6 +3,9 @@
         "stdbool.h": "c",
         "stdint.h": "c",
         "stdint-gcc.h": "c",
-        "threads.h": "c"
+        "threads.h": "c",
+        "stm32f401.h": "c",
+        "core_cm4.h": "c",
+        "system_core.h": "c"
     }
 }
