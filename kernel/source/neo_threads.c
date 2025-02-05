@@ -2,42 +2,10 @@
 #include "system_core.h"
 
 #define PROCESSOR_MODE_BIT (24U)
-#define MAX_THREADS (4U)       // must be a power of 2
-#define TIME_PER_THREAD (1000) // a thread runs for one second
+#define MAX_THREADS (4)
 
 static volatile neo_thread_t *thread_queue[MAX_THREADS];
-static volatile int8_t thread_queue_index = 0;
-
-/* Ticks when the last thread was started */
-static volatile uint32_t last_thread_start_ticks;
-static volatile uint8_t running_thread_index;
-
-void thread_handler(void)
-{
-    if (TIME_PER_THREAD <= get_tick_count() - last_thread_start_ticks)
-    {
-        // Save current SP to thread queue
-        __asm__ volatile("str sp, [%0]"
-                         :
-                         : "r"(&thread_queue[running_thread_index]->stack_ptr)
-                         : "memory");
-
-        running_thread_index = (running_thread_index + 1) & (MAX_THREADS - 1);
-
-        // Restore SP from next thread
-        __asm__ volatile("ldr sp, [%0]"
-                         :
-                         : "r"(&thread_queue[running_thread_index]->stack_ptr)
-                         : "memory");
-        last_thread_start_ticks = get_tick_count();
-    }
-    return;
-}
-void init_neo()
-{
-    // sysclock_init()
-    setup_systick(1); // systick returns an interrupt every millisecond
-}
+static volatile uint8_t thread_queue_index;
 
 bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg)
 {
@@ -78,7 +46,7 @@ bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void 
     /* thread_function is the function the thread will execute; thread_function_arg is the initial argument passed to the thread function */
 
     /* Initialize stack pointer to end of stack area */
-    thread->stack_ptr = (uint8_t *)thread->stack + 4 * STACK_SIZE;
+    thread->stack_ptr = (uint8_t *)&thread->stack[STACK_SIZE];
 
     uint32_t *ptr = (uint32_t *)thread->stack_ptr;
 
@@ -103,23 +71,23 @@ bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void 
      * Set to 0 since thread_function should never return
      * In a proper implementation, this could point to an error handler
      */
-    *(--ptr) = 0x0U;
+    *(--ptr) = 0x11U;
 
     /* R12 (IP) - Intra-Procedure scratch register
      * Initialized to 0 as it's caller-saved and not needed initially
      */
-    *(--ptr) = 0x0U;
+    *(--ptr) = 0x22U;
 
     /* R3 - General-purpose register
      * Initialized to 0 as no initial argument passing is implemented
      */
-    *(--ptr) = 0x0U;
+    *(--ptr) = 0x33U;
 
     /* R2 - General-purpose register */
-    *(--ptr) = 0x0U;
+    *(--ptr) = 0x44U;
 
     /* R1 - General-purpose register */
-    *(--ptr) = 0x0U;
+    *(--ptr) = 0x55U;
 
     /* R0 - General-purpose register
      * First argument register; contains the argument to the thread function
@@ -128,4 +96,5 @@ bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void 
 
     /* Update thread's stack pointer to point to the top of our constructed frame */
     thread->stack_ptr = (uint8_t *)ptr;
+    return true;
 }

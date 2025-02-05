@@ -222,8 +222,8 @@ __attribute__((used)) void reset_handler(void)
         *dst_ptr++ = 0;
     }
 
-    // enable the FPU
-    enable_fpu();
+    /* // enable the FPU
+    enable_fpu(); */
 
     // since we are not linking the C standard library with the project, there is no
     // need to call the C lib init constructor function __libc_init_array()

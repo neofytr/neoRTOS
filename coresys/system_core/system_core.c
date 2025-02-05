@@ -36,10 +36,15 @@ static volatile uint32_t tick_count;
  * Note: This function doesn't require interrupt protection as it's the only
  * function modifying tick_count besides main(), which handles its own protection.
  */
-void SysTick_handler(void)
+__attribute__((naked)) void SysTick_handler(void)
 {
-    tick_count++;
-    thread_handler();
+    __asm__ volatile(
+        "ldr r0, =tick_count   \n" // Load address of tick_count
+        "ldr r1, [r0]          \n" // Load tick_count value
+        "add r1, r1, #1        \n" // Increment tick_count
+        "str r1, [r0]          \n" // Store updated value back
+        "b thread_handler      \n" // Branch to thread_handler
+    );
 }
 
 /**
@@ -128,7 +133,7 @@ void setup_systick(uint32_t systick_interrupt_period)
     SysTick->LOAD = 0x00FFFFFF & (unsigned int)(systick_interrupt_period * SYS_CLOCK / 1000U - 1);
 }
 
-static inline void default_thread_handler(void)
+__attribute__((naked)) void default_thread_handler(void)
 {
     return;
 }
