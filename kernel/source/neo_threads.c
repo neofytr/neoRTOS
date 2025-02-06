@@ -13,8 +13,8 @@ volatile uint32_t has_threads_started = 0;
 
 #define MAX_THREADS (10U)
 #define PROCESSOR_MODE_BIT (24U)
-static neo_thread_t volatile *thread_queue[MAX_THREADS];
-uint8_t thread_queue_len = 0;
+neo_thread_t volatile *thread_queue[MAX_THREADS];
+uint32_t thread_queue_len = 0;
 
 void neo_kernel_init()
 {
@@ -23,76 +23,88 @@ void neo_kernel_init()
     // smallest unit of time measured by system is 100 miliseconds
 }
 
-__attribute__((naked)) void thread_handler(void) // naked function; interrupts are disabled before calling this function and enabled before returning from systick
+__attribute__((naked)) void thread_handler(void)
 {
-    /* To call a function, first push lr, do bl function, then pop lr; in the function there should be a bx lr at the last */
     __asm__ volatile(
         ".extern exit_from_interrupt_"
         "cpsid i \n"
+
+        // Check if threads started
         "ldr r0, =has_threads_started \n"
         "ldr r0, [r0] \n"
         "cpsie i \n"
-        "cmp r0, 0 \n"
+        "cmp r0, #0 \n"
         "beq threads_not_started \n"
+
+        // Check time slice
         "cpsie i \n"
-        "ldr r0, =last_thread_start_tick \n" // Load address of last_thread_start_tick
-        "ldr r2, [r0] \n"                    // Load last_thread_start_tick value; r1 still contains the current tick value
+        "ldr r0, =last_thread_start_tick \n"
+        "ldr r2, [r0] \n"
         "cpsie i \n"
-        "sub r1, r1, r2 \n"                    // Subtract last_thread_start_tick from current tick value; r1 contains the time the thread has been running for;  we can still use this value as this will be the current value only
-                                               // only the sys_tick handler can change the value of the tick_counter variable and since we're inside a systick handler, we can't be preempted by another one of the same type (same priority that is)
-        "cmp r1, #10 \n"                     // Compare the difference with TIME_SLICE
-        "ble thread_time_slice_not_expired \n" // If the difference is less than TIME_SLICE, jump to thread_time_slice_not_expired
-        "bl neo_thread_scheduler \n"           // Call the scheduler
-        "b neo_context_switch \n"              // switch the stack frames from old thread to new thread
-        "switch: \n"                           // stack frame switched; we are in the stack frame of the new thread
+        "sub r1, r1, r2 \n"
+        "cmp r1, #10 \n"
+        "ble thread_time_slice_not_expired \n"
+
+        // Save R4-R11 before context switch (if not first time)
+        "ldr r0, =is_first_time \n"
+        "ldr r0, [r0] \n"
+        "cmp r0, #1 \n"
+        "beq skip_save \n"
+        "push {r4-r11} \n"
+
+        "skip_save: \n"
+        "bl neo_thread_scheduler \n"
+        "b neo_context_switch \n"
+
+        "switch: \n"
+        // After switch, restore R4-R11
+        "pop {r4-r11} \n"
+
         "threads_not_started: \n"
         "thread_time_slice_not_expired: \n"
-        "b exit_from_interrupt_ \n"); // simply return from the handler
+        "b exit_from_interrupt_ \n");
 }
 
 __attribute__((naked)) void neo_context_switch(void)
 {
     __asm__ volatile(
-        // Disable interrupts
         "cpsid i \n"
 
-        // Check if thread queue is empty
         "ldr r0, =thread_queue_len \n"
         "ldr r0, [r0] \n"
         "cmp r0, #0 \n"
-        "beq 2f \n" // Jump to enable_irq if queue empty
+        "beq 2f \n"
 
         "ldr r0, =is_first_time \n"
         "ldr r0, [r0] \n"
-        "cmp r0, 1 \n"
+        "cmp r0, #1 \n"
         "beq first_time \n"
-        // Save current stack pointer
+
+        // Save current SP to thread_queue[last_running_thread_index]
         "ldr r0, =thread_queue \n"
-        "ldr r0, [r0] \n"
         "ldr r1, =last_running_thread_index \n"
         "ldr r1, [r1] \n"
-        "mov r2, %[thread_size] \n"
-        "mul r1, r1, r2 \n"
+        "lsl r1, r1, #2 \n" // Multiply by 4 for pointer array index
         "add r0, r0, r1 \n"
+        "ldr r0, [r0] \n" // Load the thread pointer
         "str sp, [r0] \n"
 
         "first_time: \n"
-        // Load new stack pointer
+        // Load SP from thread_queue[curr_running_thread_index]
         "ldr r0, =thread_queue \n"
-        "ldr r0, [r0] \n"
         "ldr r1, =curr_running_thread_index \n"
         "ldr r1, [r1] \n"
-        "mul r1, r1, r2 \n"
+        "lsl r1, r1, #2 \n" // Multiply by 4 for pointer array index
         "add r0, r0, r1 \n"
+        "ldr r0, [r0] \n" // Load the thread pointer
         "ldr sp, [r0] \n"
+        "ldr r0, =is_first_time \n"
+        "mov r1, #0 \n"
+        "str r1, [r0] \n"
 
-        // Enable interrupts and return
         "2: \n"
         "cpsie i \n"
-        "b switch \n"
-        :
-        : [thread_size] "i"(sizeof(neo_thread_t))
-        : "r0", "r1", "r2", "memory");
+        "b switch \n" ::: "r0", "r1", "memory");
 }
 
 // __attribute__((naked)) means no stack usage and only scratch registers used
@@ -106,10 +118,18 @@ __attribute__((naked)) void neo_thread_scheduler(void)
         __asm__ volatile("b neo_thread_scheduler_return");
     }
 
+    if (is_first_time)
+    {
+        curr_running_thread_index = 0;
+        __enable_irq();
+        __asm__ volatile("b neo_thread_scheduler_return");
+    }
+
     last_running_thread_index = curr_running_thread_index;
     curr_running_thread_index = (curr_running_thread_index + 1) & (MAX_THREADS - 1);
     if (curr_running_thread_index >= thread_queue_len)
     {
+        last_running_thread_index = 1;
         curr_running_thread_index = 0;
     }
     last_thread_start_tick = tick_count;
@@ -176,6 +196,11 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void
     *(--ptr) = 0;                         // R1
     *(--ptr) = (uint32_t)thread_arg;      // R0 - First argument
 
+    for (int i = 0; i < 8; i++)
+    {
+        *(--ptr) = 0; // R4-R11
+    }
+
     thread->stack_ptr = (uint8_t *)ptr;
 
     return true;
@@ -183,5 +208,6 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void
 
 void neo_start_threads(void)
 {
+    last_thread_start_tick = get_tick_count() + 10;
     has_threads_started = 1;
 }
