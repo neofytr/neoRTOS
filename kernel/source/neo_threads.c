@@ -1,4 +1,5 @@
 #include "neo_threads.h"
+#include "core_cm4.h"
 #include "system_core.h"
 
 #define PROCESSOR_MODE_BIT (24U)
@@ -8,17 +9,17 @@
 static neo_thread_t *volatile thread_queue[MAX_THREADS]; // this makes the pointer volatile; placing volatile before the type name will make the contents of the pointer volatile
 static volatile uint8_t thread_queue_index;
 
-neo_thread_t *volatile nex_thread;
-neo_thread_t *volatile curr_thread;
+static volatile uint8_t curr_thread_index;
+static volatile uint8_t next_thread_index;
 
 #define TIME_PER_THREAD 1000
 
-static volatile uint8_t last_thread_start_ticks;
-static volatile uint8_t running_thread_index;
-
 __attribute__((naked)) void thread_handler(void)
 {
+    // disable interrupts since neo_thread_scheduler access shared resources
+    __disable_irq();
     __asm__ volatile("b neo_thread_scheduler \n");
+    __enable_irq();
 }
 
 void neo_thread_scheduler(void)
@@ -31,6 +32,15 @@ void PendSV_handler(void)
 
 bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg, uint8_t *stack, uint32_t stack_size)
 {
+    __disable_irq(); // accessing and modifying shared resource; disable interrupts
+    if (thread_queue_index >= MAX_THREADS)
+    {
+        return false;
+    }
+
+    thread_queue[thread_queue_index++] = thread;
+    __enable_irq();
+
     /*
      * Thread Stack Frame Initialization for ARM Cortex-M4
      * ------------------------------------------------
