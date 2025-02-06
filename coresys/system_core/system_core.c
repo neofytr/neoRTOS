@@ -38,12 +38,13 @@ static volatile uint32_t tick_count;
  */
 __attribute__((naked)) void SysTick_handler(void)
 {
+    /* LR is loaded with EXC_RETURN upon exception entry; this must be popped into PC to return from exception properlyi */
     __asm__ volatile(
         "ldr r0, =tick_count   \n" // Load address of tick_count
         "ldr r1, [r0]          \n" // Load tick_count value
         "add r1, r1, #1        \n" // Increment tick_count
         "str r1, [r0]          \n" // Store updated value back
-        "b thread_handler      \n" // Branch to thread_handler
+        "bx lr                 \n" // Return from interrupt; stack must be the way it was before interrupt entry as setup by the CPU and LR should be loaded with appropriate EXC_RETURN value to return from exception
     );
 }
 
@@ -69,7 +70,7 @@ uint32_t get_tick_count(void)
  *
  * Configures PA5 as a general-purpose output for LED control:
  * 1. Enables GPIOA clock in AHB1 bus
- * 2. Sets PA5 to general purpose output mode (01)
+ * 2. Sets PA5 to general purpose output mode (01)qu
  */
 void LED_setup(void)
 {

@@ -10,10 +10,11 @@
 
 /* This kernel works currently only without the floating-point hardware being enabled */
 
+uint32_t thread_one_stack[40];
 neo_thread_t thread_one;
-neo_thread_t thread_two;
 
-bool has_run = false;
+uint32_t thread_two_stack[40];
+neo_thread_t thread_two;
 
 void thread_two_fxn(void *arg)
 {
@@ -68,9 +69,10 @@ void thread_one_fxn(void *arg)
 int main(void)
 {
     LED_setup();
-    setup_systick(1); // give an interrupt every millisecond
-    init_thread(&thread_one, thread_one_fxn, NULL);
-    init_thread(&thread_two, thread_two_fxn, NULL);
+    setup_systick(1); // give an interrupt every 1 millisecond
+    neo_kernel_init();
+    neo_thread_start(&thread_one, thread_one_fxn, NULL, (uint8_t *)thread_one_stack, 40 * 4);
+    neo_thread_start(&thread_two, thread_two_fxn, NULL, (uint8_t *)thread_two_stack, 40 * 4);
 
     while (true)
         ;
