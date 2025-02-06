@@ -21,6 +21,7 @@ void neo_kernel_init()
     setup_systick(100); // interrupt every 100 miliseconds
     // each tick count value represents 100 miliseconds
     // smallest unit of time measured by system is 100 miliseconds
+    NVIC_EnableIRQ(PendSV_IRQn);
 }
 
 __attribute__((naked)) void thread_handler(void)
@@ -37,20 +38,28 @@ __attribute__((naked)) void thread_handler(void)
         "cpsid i \n"
         "ldr r0, =is_first_time \n"
         "ldr r0, [r0] \n"
+        "cpsie i \n"
         "cmp r0, #1 \n"
         "beq first_time_thread_handler \n"
 
         "cpsid i \n"
+        "ldr r1, =tick_count \n"
+        "ldr r1, [r1] \n"
         "ldr r0, =last_thread_start_tick \n"
         "ldr r2, [r0] \n"
         "cpsie i \n"
         "sub r1, r1, r2 \n"
         "cmp r1, #10 \n"
-        "ble thread_time_slice_not_expired \n"
+        "blt thread_time_slice_not_expired \n"
 
         "first_time_thread_handler:   \n");
 
-    NVIC_SetPendingIRQ(PendSV_IRQn); // trigger PendSV to perform context switch
+#define PendSV_Interrupt_Number (14U)
+
+    // Writing 1 to this bit is the only way to set the PendSV exception state to pending.
+    SCB->ICSR |= (1U << (2 * PendSV_Interrupt_Number)); // trigger PendSV exception
+
+#undef PendSV_Interrupt_Number
 
     __asm__ volatile(
         "threads_not_started: \n"
@@ -61,8 +70,10 @@ __attribute__((naked)) void thread_handler(void)
 __attribute__((naked)) void PendSV_handler(void)
 {
     __asm__ volatile(
+        "cpsid i \n"
         "ldr r0, =is_first_time \n"
         "ldr r0, [r0] \n"
+        "cpsie i \n"
         "cmp r0, #1 \n"
         "beq skip_save \n"
         "push {r4-r11} \n"
@@ -207,6 +218,7 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void
     __disable_irq();
     if (thread_queue_len >= MAX_THREADS)
     {
+        __enable_irq();
         return false;
     }
 
@@ -266,6 +278,6 @@ void neo_start_threads(void)
 {
     __disable_irq();
     has_threads_started = 1;
-    __enable_irq();
     NVIC_SetPriority(PendSV_IRQn, 0xFF); // give lowest priority to PendSV; useful for context switching
+    __enable_irq();
 }

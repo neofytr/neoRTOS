@@ -16,6 +16,9 @@ neo_thread_t thread_two;
 uint32_t thread_two_stack[40];
 void thread_two_fxn(void *arg)
 {
+    if (*(int *)arg++)
+    {
+    }
     while (true)
     {
         GPIOA->ODR &= ~(1 << PIN5);
@@ -25,6 +28,9 @@ void thread_two_fxn(void *arg)
 uint32_t thread_one_stack[40];
 void thread_one_fxn(void *arg)
 {
+    if (*(int *)arg++)
+    {
+    }
     while (true)
     {
         GPIOA->ODR |= (1 << PIN5);
