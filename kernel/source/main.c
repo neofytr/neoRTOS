@@ -17,7 +17,7 @@ void thread_two_fxn(void *arg)
     bool is_on = false;
     while (true)
     {
-        if (has_time_passed(1000, start))
+        if (has_time_passed(10, start)) // checks if a second is passed since each tick value represents 100 ms
         {
             start = get_tick_count();
             if (is_on)
