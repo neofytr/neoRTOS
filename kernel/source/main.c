@@ -41,7 +41,7 @@ void thread_one_fxn(void *arg)
     bool is_on = false;
     while (true)
     {
-        if (has_time_passed(1000, start))
+        if (has_time_passed(10, start)) // checks for a second
         {
             start = get_tick_count();
             if (is_on)
