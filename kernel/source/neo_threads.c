@@ -54,14 +54,8 @@ static volatile uint8_t running_thread_index;
     __asm__ volatile("bx lr \n");
 } */
 
-bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg)
+bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg, uint8_t *stack, uint32_t stack_size)
 {
-    if (thread_queue_index >= MAX_THREADS)
-    {
-        return false;
-    }
-
-    thread_queue[thread_queue_index++] = thread;
     /*
      * Thread Stack Frame Initialization for ARM Cortex-M4
      * ------------------------------------------------
@@ -90,10 +84,46 @@ bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void 
      * 3. Begin execution at the address specified in PC
      */
 
+    /*
+
+    During Thread Creation:
+
+    The stack is initialized from top to bottom with all necessary registers
+    First, we push the exception stack frame (R0-R3, R12, LR, PC, xPSR)
+    Then, we push the additional context registers (R4-R11)
+    The thread's stack pointer is saved pointing to R4, the top of our complete stack frame
+
+    During Context Switch (in interrupt handler):
+
+    Current Thread → Save Phase:
+    1. Push R4-R11 of current thread onto its stack
+    2. Save current stack pointer in thread control block
+
+    New Thread → Restore Phase:
+    1. Load new thread's stack pointer
+    2. Pop R4-R11 from new thread's stack
+    3. Execute return-from-interrupt (which restores R0-R3, R12, LR, PC, xPSR)
+
+    The Context Switch Mechanism:
+
+    When an interrupt or exception occurs, hardware automatically pushes R0-R3, R12, LR, PC, xPSR
+    The interrupt handler must manually save R4-R11 of the current thread
+    After switching to the new thread's stack, R4-R11 are manually restored
+    The return-from-interrupt instruction (typically triggered by loading 0xFFFFFFF9 into PC) automatically restores the exception stack frame
+
+    Special Considerations:
+
+    The initial values (0x66U through 0xDDU) are arbitrary but help with debugging
+    Stack alignment (8-byte) is maintained throughout for ARM AAPCS compliance
+    This implementation assumes no FPU usage (no S0-S31 registers saved)
+    The order of registers matches the ARM AAPCS specification for maximum compatibility
+
+    */
+
     /* thread_function is the function the thread will execute; thread_function_arg is the initial argument passed to the thread function */
 
     /* Initialize stack pointer to end of stack area */
-    thread->stack_ptr = (uint8_t *)&thread->stack[STACK_SIZE];
+    thread->stack_ptr = (uint8_t *)((uintptr_t)stack + stack_size);
 
     uint32_t *ptr = (uint32_t *)thread->stack_ptr;
 
@@ -140,6 +170,47 @@ bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void 
      * First argument register; contains the argument to the thread function
      */
     *(--ptr) = (uintptr_t)thread_function_arg;
+
+    /* Save the registers R4-R11 next; push these registers immediately after entering the interrupt handler and before switching stack frame when doing a context switch to another thread */
+    /* Pop them after switching the stack frame and before doing bx lr from the interrupt handler */
+
+    /* R4-R11 are callee-saved registers that must be preserved across function calls
+     * These registers form the additional context that must be saved/restored during
+     * context switches but are not automatically handled by the exception stack frame
+     */
+
+    /* R11 (FP) - Frame Pointer
+     * Used in stack unwinding and debugging
+     * Initialize to 0 as we're starting a new thread context
+     */
+    *(--ptr) = 0x66U;
+
+    /* R10 - General-purpose register
+     * Often used as static base register in position-independent code
+     */
+    *(--ptr) = 0x77U;
+
+    /* R9 (SB) - Static Base register
+     * Platform-specific use, often for accessing static data
+     */
+    *(--ptr) = 0x88U;
+
+    /* R8 - General-purpose register */
+    *(--ptr) = 0x99U;
+
+    /* R7 - General-purpose register
+     * Sometimes used as frame pointer in Thumb state
+     */
+    *(--ptr) = 0xAAU;
+
+    /* R6 - General-purpose register */
+    *(--ptr) = 0xBBU;
+
+    /* R5 - General-purpose register */
+    *(--ptr) = 0xCCU;
+
+    /* R4 - General-purpose register */
+    *(--ptr) = 0xDDU;
 
     /* Update thread's stack pointer to point to the top of our constructed frame */
     thread->stack_ptr = (uint8_t *)ptr;

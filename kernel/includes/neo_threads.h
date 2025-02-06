@@ -3,12 +3,11 @@
 
 #define STACK_SIZE (100) // in words (32-bits)
 
+/* Thread Control Block (TCB) */
 typedef struct
 {
-    uint8_t *stack_ptr;
-    __attribute__((aligned(8))) uint32_t stack[STACK_SIZE]; // aligned to 8 bytes so that stack_ptr is aligned to 8 bytes (following ACPSR)
+    uint8_t *stack_ptr; // must be aligned to 8 bytes (following AAPCS)
 } neo_thread_t;
 
-bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg);
-void init_neo();
+bool neo_thread_start(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg, uint8_t *stack, uint32_t stack_size); // stack size in bytes
 void thread_handler();
