@@ -18,6 +18,7 @@ void thread_two_fxn(void *arg)
 {
     while (true)
     {
+        GPIOA->ODR &= ~(1 << PIN5);
     }
 }
 
@@ -26,6 +27,7 @@ void thread_one_fxn(void *arg)
 {
     while (true)
     {
+        GPIOA->ODR |= (1 << PIN5);
     }
 }
 
