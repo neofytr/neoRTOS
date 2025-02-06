@@ -40,11 +40,14 @@ __attribute__((naked)) void SysTick_handler(void)
 {
     /* LR is loaded with EXC_RETURN upon exception entry; this must be popped into PC to return from exception properlyi */
     __asm__ volatile(
-        "ldr r0, =tick_count   \n" // Load address of tick_count
-        "ldr r1, [r0]          \n" // Load tick_count value
-        "add r1, r1, #1        \n" // Increment tick_count
-        "str r1, [r0]          \n" // Store updated value back
-        "bx lr                 \n" // Return from interrupt; stack must be the way it was before interrupt entry as setup by the CPU and LR should be loaded with appropriate EXC_RETURN value to return from exception
+        "ldr r0, =tick_count   \n"  // Load address of tick_count
+        "ldr r1, [r0]          \n"  // Load tick_count value
+        "add r1, r1, #1        \n"  // Increment tick_count
+        "str r1, [r0]          \n"  // Store updated value back
+        "push {lr}             \n"  // Save LR to stack; required for exception return (EXC_RETURN)
+        "bl thread_handler      \n" // Branch with link to thread handler
+        "pop {lr}              \n"  // Restore LR from stack; required for exception return (EXC_RETURN)
+        "bx lr                 \n"  // Return from interrupt; stack must be the way it was before interrupt entry as setup by the CPU and LR should be loaded with appropriate EXC_RETURN value to return from exception
     );
 }
 
@@ -136,10 +139,10 @@ void setup_systick(uint32_t systick_interrupt_period)
 
 __attribute__((naked)) void default_thread_handler(void)
 {
-    return;
+    __asm__ volatile("bx lr \n"); // simply return from the handler
 }
 
-__attribute__((weak, alias("default_thread_handler"))) void thread_handler(void);
+__attribute__((weak, alias("default_thread_handler"), naked)) void thread_handler(void);
 
 /* Undefine all local macros */
 #undef GPIOA_EN

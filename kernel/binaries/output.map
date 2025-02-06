@@ -32,6 +32,7 @@ Discarded input sections
  .group         0x00000000        0xc binaries/main.o
  .group         0x00000000        0xc binaries/main.o
  .data          0x00000000        0x0 binaries/main.o
+ .bss           0x00000000        0x4 binaries/main.o
  .comment       0x00000000       0x46 binaries/main.o
  .ARM.attributes
                 0x00000000       0x34 binaries/main.o
@@ -44,13 +45,8 @@ Discarded input sections
  .group         0x00000000        0xc binaries/neo_threads.o
  .group         0x00000000        0xc binaries/neo_threads.o
  .group         0x00000000        0xc binaries/neo_threads.o
- .group         0x00000000        0xc binaries/neo_threads.o
- .group         0x00000000        0xc binaries/neo_threads.o
- .group         0x00000000        0xc binaries/neo_threads.o
- .group         0x00000000        0xc binaries/neo_threads.o
- .group         0x00000000        0xc binaries/neo_threads.o
- .group         0x00000000        0xc binaries/neo_threads.o
  .data          0x00000000        0x0 binaries/neo_threads.o
+ .bss           0x00000000        0x4 binaries/neo_threads.o
  .debug_macro   0x00000000      0xad2 binaries/neo_threads.o
  .debug_macro   0x00000000       0x22 binaries/neo_threads.o
  .debug_macro   0x00000000       0x56 binaries/neo_threads.o
@@ -59,12 +55,6 @@ Discarded input sections
  .debug_macro   0x00000000       0x6a binaries/neo_threads.o
  .debug_macro   0x00000000      0x1df binaries/neo_threads.o
  .debug_macro   0x00000000       0x22 binaries/neo_threads.o
- .debug_macro   0x00000000     0xb896 binaries/neo_threads.o
- .debug_macro   0x00000000       0x1c binaries/neo_threads.o
- .debug_macro   0x00000000       0x22 binaries/neo_threads.o
- .debug_macro   0x00000000       0xd9 binaries/neo_threads.o
- .debug_macro   0x00000000     0x102d binaries/neo_threads.o
- .debug_macro   0x00000000      0x11f binaries/neo_threads.o
  .debug_macro   0x00000000       0x16 binaries/neo_threads.o
  .comment       0x00000000       0x46 binaries/neo_threads.o
  .ARM.attributes
@@ -158,120 +148,119 @@ LOAD binaries/system_core.o
                 0x08000000                vectors
                 0x08000150                        . = ALIGN (0x4)
 
-.text           0x08000150      0x580
+.text           0x08000150      0x308
                 0x08000150                        . = ALIGN (0x4)
  *(.text)
- .text          0x08000150      0x108 binaries/main.o
+ .text          0x08000150       0xd0 binaries/main.o
                 0x08000150                thread_two_fxn
                 0x080001ac                thread_one_fxn
                 0x08000208                main
- .text          0x08000258      0x25c binaries/neo_threads.o
-                0x080002e8                thread_handler
-                0x08000304                neo_kernel_init
-                0x08000312                neo_thread_scheduler
-                0x08000374                PendSV_handler
-                0x08000382                neo_thread_start
- .text          0x080004b4       0xd4 binaries/startup.o
-                0x080004b4                enable_fpu
-                0x080004d8                reset_handler
-                0x08000558                system_reset
-                0x08000580                EXTI15_10_handler
-                0x08000580                DMA1_Stream7_handler
-                0x08000580                USART1_handler
-                0x08000580                TIM1_UP_TIM10_handler
-                0x08000580                EXTI0_handler
-                0x08000580                DMA1_Stream1_handler
-                0x08000580                SDIO_handler
-                0x08000580                NMI_handler
-                0x08000580                DMA2_Stream3_handler
-                0x08000580                TIM2_handler
-                0x08000580                USART2_handler
-                0x08000580                PVD_EXTI16_handler
-                0x08000580                SPI3_handler
-                0x08000580                TIM3_handler
-                0x08000580                WWDG_handler
-                0x08000580                default_handler
-                0x08000580                SPI2_handler
-                0x08000580                SVCall_handler
-                0x08000580                DMA2_Stream6_handler
-                0x08000580                DebugMonitor_handler
-                0x08000580                I2C3_ER_handler
-                0x08000580                DMA1_Stream3_handler
-                0x08000580                MemManage_handler
-                0x08000580                EXTI9_5_handler
-                0x08000580                SPI4_handler
-                0x08000580                HardFault_handler
-                0x08000580                DMA1_Stream5_handler
-                0x08000580                FPU_handler
-                0x08000580                DMA2_Stream5_handler
-                0x08000580                RCC_handler
-                0x08000580                EXTI2_handler
-                0x08000580                DMA2_Stream1_handler
-                0x08000580                I2C1_ER_handler
-                0x08000580                I2C2_EV_handler
-                0x08000580                RTC_WKUP_EXTI22_handler
-                0x08000580                EXTI3_handler
-                0x08000580                DMA2_Stream0_handler
-                0x08000580                FLASH_handler
-                0x08000580                TAMP_STAMP_EXTI21_handler
-                0x08000580                OTG_FS_handler
-                0x08000580                DMA1_Stream4_handler
-                0x08000580                I2C2_ER_handler
-                0x08000580                TIM1_BRK_TIM9_handler
-                0x08000580                USART6_handler
-                0x08000580                TIM4_handler
-                0x08000580                DMA1_Stream2_handler
-                0x08000580                EXTI4_handler
-                0x08000580                DMA1_Stream6_handler
-                0x08000580                ADC_handler
-                0x08000580                I2C1_EV_handler
-                0x08000580                SPI1_handler
-                0x08000580                OTG_FS_WKUP_EXTI18_handler
-                0x08000580                DMA2_Stream4_handler
-                0x08000580                DMA2_Stream7_handler
-                0x08000580                UsageFault_handler
-                0x08000580                DMA1_Stream0_handler
-                0x08000580                DMA2_Stream2_handler
-                0x08000580                EXTI1_handler
-                0x08000580                TIM1_TRG_COM_TIM11_handler
-                0x08000580                TIM5_handler
-                0x08000580                RTC_Alarm_EXTI17_handler
-                0x08000580                I2C3_EV_handler
-                0x08000580                BusFault_handler
-                0x08000580                TIM1_CC_handler
- .text          0x08000588      0x148 binaries/system_core.o
-                0x080005c4                SysTick_handler
-                0x080005da                get_tick_count
-                0x08000600                LED_setup
-                0x0800063c                has_time_passed
-                0x08000664                setup_systick
-                0x080006c8                default_thread_handler
+ .text          0x08000220       0x16 binaries/neo_threads.o
+                0x08000220                neo_kernel_init
+                0x0800022e                thread_handler
+ *fill*         0x08000236        0x2 
+ .text          0x08000238       0xd4 binaries/startup.o
+                0x08000238                enable_fpu
+                0x0800025c                reset_handler
+                0x080002dc                system_reset
+                0x08000304                EXTI15_10_handler
+                0x08000304                DMA1_Stream7_handler
+                0x08000304                USART1_handler
+                0x08000304                TIM1_UP_TIM10_handler
+                0x08000304                EXTI0_handler
+                0x08000304                DMA1_Stream1_handler
+                0x08000304                SDIO_handler
+                0x08000304                NMI_handler
+                0x08000304                DMA2_Stream3_handler
+                0x08000304                TIM2_handler
+                0x08000304                USART2_handler
+                0x08000304                PVD_EXTI16_handler
+                0x08000304                SPI3_handler
+                0x08000304                TIM3_handler
+                0x08000304                WWDG_handler
+                0x08000304                default_handler
+                0x08000304                SPI2_handler
+                0x08000304                SVCall_handler
+                0x08000304                DMA2_Stream6_handler
+                0x08000304                DebugMonitor_handler
+                0x08000304                I2C3_ER_handler
+                0x08000304                DMA1_Stream3_handler
+                0x08000304                MemManage_handler
+                0x08000304                EXTI9_5_handler
+                0x08000304                SPI4_handler
+                0x08000304                HardFault_handler
+                0x08000304                DMA1_Stream5_handler
+                0x08000304                FPU_handler
+                0x08000304                DMA2_Stream5_handler
+                0x08000304                RCC_handler
+                0x08000304                EXTI2_handler
+                0x08000304                DMA2_Stream1_handler
+                0x08000304                I2C1_ER_handler
+                0x08000304                I2C2_EV_handler
+                0x08000304                RTC_WKUP_EXTI22_handler
+                0x08000304                EXTI3_handler
+                0x08000304                DMA2_Stream0_handler
+                0x08000304                FLASH_handler
+                0x08000304                TAMP_STAMP_EXTI21_handler
+                0x08000304                OTG_FS_handler
+                0x08000304                DMA1_Stream4_handler
+                0x08000304                I2C2_ER_handler
+                0x08000304                TIM1_BRK_TIM9_handler
+                0x08000304                USART6_handler
+                0x08000304                TIM4_handler
+                0x08000304                DMA1_Stream2_handler
+                0x08000304                EXTI4_handler
+                0x08000304                DMA1_Stream6_handler
+                0x08000304                ADC_handler
+                0x08000304                I2C1_EV_handler
+                0x08000304                SPI1_handler
+                0x08000304                OTG_FS_WKUP_EXTI18_handler
+                0x08000304                DMA2_Stream4_handler
+                0x08000304                PendSV_handler
+                0x08000304                DMA2_Stream7_handler
+                0x08000304                UsageFault_handler
+                0x08000304                DMA1_Stream0_handler
+                0x08000304                DMA2_Stream2_handler
+                0x08000304                EXTI1_handler
+                0x08000304                TIM1_TRG_COM_TIM11_handler
+                0x08000304                TIM5_handler
+                0x08000304                RTC_Alarm_EXTI17_handler
+                0x08000304                I2C3_EV_handler
+                0x08000304                BusFault_handler
+                0x08000304                TIM1_CC_handler
+ .text          0x0800030c      0x14c binaries/system_core.o
+                0x08000348                SysTick_handler
+                0x08000360                get_tick_count
+                0x08000388                LED_setup
+                0x080003c4                has_time_passed
+                0x080003ec                setup_systick
+                0x08000450                default_thread_handler
  *(.text*)
  *(.rodata)
  *(.rodata*)
-                0x080006d0                        . = ALIGN (0x4)
-                0x080006d0                        _etext = .
-                0x080006d0                        _sidata = LOADADDR (.data)
+                0x08000458                        . = ALIGN (0x4)
+                0x08000458                        _etext = .
+                0x08000458                        _sidata = LOADADDR (.data)
 
-.glue_7         0x080006d0        0x0
- .glue_7        0x080006d0        0x0 linker stubs
+.glue_7         0x08000458        0x0
+ .glue_7        0x08000458        0x0 linker stubs
 
-.glue_7t        0x080006d0        0x0
- .glue_7t       0x080006d0        0x0 linker stubs
+.glue_7t        0x08000458        0x0
+ .glue_7t       0x08000458        0x0 linker stubs
 
-.vfp11_veneer   0x080006d0        0x0
- .vfp11_veneer  0x080006d0        0x0 linker stubs
+.vfp11_veneer   0x08000458        0x0
+ .vfp11_veneer  0x08000458        0x0 linker stubs
 
-.v4_bx          0x080006d0        0x0
- .v4_bx         0x080006d0        0x0 linker stubs
+.v4_bx          0x08000458        0x0
+ .v4_bx         0x08000458        0x0 linker stubs
 
-.iplt           0x080006d0        0x0
- .iplt          0x080006d0        0x0 binaries/main.o
+.iplt           0x08000458        0x0
+ .iplt          0x08000458        0x0 binaries/main.o
 
-.rel.dyn        0x080006d0        0x0
- .rel.iplt      0x080006d0        0x0 binaries/main.o
+.rel.dyn        0x08000458        0x0
+ .rel.iplt      0x08000458        0x0 binaries/main.o
 
-.data           0x20000000        0x0 load address 0x080006d0
+.data           0x20000000        0x0 load address 0x08000458
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _sdata = .
  *(.data)
@@ -279,42 +268,36 @@ LOAD binaries/system_core.o
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _edata = .
 
-.igot.plt       0x20000000        0x0 load address 0x080006d0
+.igot.plt       0x20000000        0x0 load address 0x08000458
  .igot.plt      0x20000000        0x0 binaries/main.o
 
-.bss            0x20000000      0x16c load address 0x080006d0
+.bss            0x20000000        0x4 load address 0x08000458
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        __bss_start__ = .
  *(.bss)
- .bss           0x20000000      0x14c binaries/main.o
-                0x20000004                thread_one_stack
-                0x200000a4                thread_one
-                0x200000a8                thread_two_stack
-                0x20000148                thread_two
- .bss           0x2000014c       0x1c binaries/neo_threads.o
- .bss           0x20000168        0x4 binaries/system_core.o
+ .bss           0x20000000        0x4 binaries/system_core.o
  *(.bss*)
  *(COMMON)
-                0x2000016c                        . = ALIGN (0x4)
-                0x2000016c                        __bss_end__ = .
+                0x20000004                        . = ALIGN (0x4)
+                0x20000004                        __bss_end__ = .
 
-.heap           0x2000016c      0x404 load address 0x080006d0
-                0x20000170                        . = ALIGN (0x8)
- *fill*         0x2000016c        0x4 
-                0x20000170                        _heap_start = .
-                0x20000570                        . = (. + __max_heap_size)
- *fill*         0x20000170      0x400 
-                0x20000570                        . = ALIGN (0x8)
-                0x20000570                        _heap_end = .
-                0x20000570                        _end = .
+.heap           0x20000004      0x404 load address 0x08000458
+                0x20000008                        . = ALIGN (0x8)
+ *fill*         0x20000004        0x4 
+                0x20000008                        _heap_start = .
+                0x20000408                        . = (. + __max_heap_size)
+ *fill*         0x20000008      0x400 
+                0x20000408                        . = ALIGN (0x8)
+                0x20000408                        _heap_end = .
+                0x20000408                        _end = .
 
-.stack          0x20000570      0x200 load address 0x080006d0
-                0x20000570                        . = ALIGN (0x8)
-                0x20000570                        _stack_start = .
-                0x20000770                        . = (. + __max_stack_size)
- *fill*         0x20000570      0x200 
-                0x20000770                        . = ALIGN (0x8)
-                0x20000770                        _stack_end = .
+.stack          0x20000408      0x200 load address 0x08000458
+                0x20000408                        . = ALIGN (0x8)
+                0x20000408                        _stack_start = .
+                0x20000608                        . = (. + __max_stack_size)
+ *fill*         0x20000408      0x200 
+                0x20000608                        . = ALIGN (0x8)
+                0x20000608                        _stack_end = .
 
 /DISCARD/
  *(.comment)
@@ -324,17 +307,17 @@ LOAD binaries/system_core.o
 OUTPUT(binaries/output.elf elf32-littlearm)
 LOAD linker stubs
 
-.debug_info     0x00000000     0x154f
- .debug_info    0x00000000      0x2fe binaries/main.o
- .debug_info    0x000002fe      0x742 binaries/neo_threads.o
- .debug_info    0x00000a40      0x376 binaries/startup.o
- .debug_info    0x00000db6      0x799 binaries/system_core.o
+.debug_info     0x00000000      0xe00
+ .debug_info    0x00000000      0x21b binaries/main.o
+ .debug_info    0x0000021b       0xd6 binaries/neo_threads.o
+ .debug_info    0x000002f1      0x376 binaries/startup.o
+ .debug_info    0x00000667      0x799 binaries/system_core.o
 
-.debug_abbrev   0x00000000      0x760
- .debug_abbrev  0x00000000      0x1b6 binaries/main.o
- .debug_abbrev  0x000001b6      0x249 binaries/neo_threads.o
- .debug_abbrev  0x000003ff      0x182 binaries/startup.o
- .debug_abbrev  0x00000581      0x1df binaries/system_core.o
+.debug_abbrev   0x00000000      0x55b
+ .debug_abbrev  0x00000000      0x159 binaries/main.o
+ .debug_abbrev  0x00000159       0xa1 binaries/neo_threads.o
+ .debug_abbrev  0x000001fa      0x182 binaries/startup.o
+ .debug_abbrev  0x0000037c      0x1df binaries/system_core.o
 
 .debug_aranges  0x00000000       0x80
  .debug_aranges
@@ -346,57 +329,57 @@ LOAD linker stubs
  .debug_aranges
                 0x00000060       0x20 binaries/system_core.o
 
-.debug_macro    0x00000000     0xe7e8
- .debug_macro   0x00000000      0x1a7 binaries/main.o
- .debug_macro   0x000001a7      0xad2 binaries/main.o
- .debug_macro   0x00000c79       0x22 binaries/main.o
- .debug_macro   0x00000c9b       0x56 binaries/main.o
- .debug_macro   0x00000cf1       0x51 binaries/main.o
- .debug_macro   0x00000d42      0x103 binaries/main.o
- .debug_macro   0x00000e45       0x6a binaries/main.o
- .debug_macro   0x00000eaf      0x1df binaries/main.o
- .debug_macro   0x0000108e       0x22 binaries/main.o
- .debug_macro   0x000010b0     0xb896 binaries/main.o
- .debug_macro   0x0000c946       0x1c binaries/main.o
- .debug_macro   0x0000c962       0x22 binaries/main.o
- .debug_macro   0x0000c984       0xd9 binaries/main.o
- .debug_macro   0x0000ca5d     0x102d binaries/main.o
- .debug_macro   0x0000da8a      0x11f binaries/main.o
- .debug_macro   0x0000dba9       0x16 binaries/main.o
- .debug_macro   0x0000dbbf       0x2a binaries/main.o
- .debug_macro   0x0000dbe9       0x7b binaries/main.o
- .debug_macro   0x0000dc64       0x3c binaries/main.o
- .debug_macro   0x0000dca0       0x34 binaries/main.o
- .debug_macro   0x0000dcd4       0x16 binaries/main.o
- .debug_macro   0x0000dcea      0x11c binaries/main.o
- .debug_macro   0x0000de06       0x9b binaries/main.o
- .debug_macro   0x0000dea1      0x364 binaries/main.o
- .debug_macro   0x0000e205       0x16 binaries/main.o
- .debug_macro   0x0000e21b       0x4a binaries/main.o
- .debug_macro   0x0000e265       0x34 binaries/main.o
- .debug_macro   0x0000e299       0x10 binaries/main.o
- .debug_macro   0x0000e2a9       0x58 binaries/main.o
- .debug_macro   0x0000e301      0x1e5 binaries/main.o
- .debug_macro   0x0000e4e6       0x22 binaries/main.o
- .debug_macro   0x0000e508       0xea binaries/neo_threads.o
- .debug_macro   0x0000e5f2       0xda binaries/startup.o
- .debug_macro   0x0000e6cc      0x11c binaries/system_core.o
+.debug_macro    0x00000000     0xe771
+ .debug_macro   0x00000000      0x1a1 binaries/main.o
+ .debug_macro   0x000001a1      0xad2 binaries/main.o
+ .debug_macro   0x00000c73       0x22 binaries/main.o
+ .debug_macro   0x00000c95       0x56 binaries/main.o
+ .debug_macro   0x00000ceb       0x51 binaries/main.o
+ .debug_macro   0x00000d3c      0x103 binaries/main.o
+ .debug_macro   0x00000e3f       0x6a binaries/main.o
+ .debug_macro   0x00000ea9      0x1df binaries/main.o
+ .debug_macro   0x00001088       0x22 binaries/main.o
+ .debug_macro   0x000010aa     0xb896 binaries/main.o
+ .debug_macro   0x0000c940       0x1c binaries/main.o
+ .debug_macro   0x0000c95c       0x22 binaries/main.o
+ .debug_macro   0x0000c97e       0xd9 binaries/main.o
+ .debug_macro   0x0000ca57     0x102d binaries/main.o
+ .debug_macro   0x0000da84      0x11f binaries/main.o
+ .debug_macro   0x0000dba3       0x16 binaries/main.o
+ .debug_macro   0x0000dbb9       0x2a binaries/main.o
+ .debug_macro   0x0000dbe3       0x7b binaries/main.o
+ .debug_macro   0x0000dc5e       0x3c binaries/main.o
+ .debug_macro   0x0000dc9a       0x34 binaries/main.o
+ .debug_macro   0x0000dcce       0x16 binaries/main.o
+ .debug_macro   0x0000dce4      0x11c binaries/main.o
+ .debug_macro   0x0000de00       0x9b binaries/main.o
+ .debug_macro   0x0000de9b      0x364 binaries/main.o
+ .debug_macro   0x0000e1ff       0x16 binaries/main.o
+ .debug_macro   0x0000e215       0x4a binaries/main.o
+ .debug_macro   0x0000e25f       0x34 binaries/main.o
+ .debug_macro   0x0000e293       0x10 binaries/main.o
+ .debug_macro   0x0000e2a3       0x58 binaries/main.o
+ .debug_macro   0x0000e2fb      0x1e5 binaries/main.o
+ .debug_macro   0x0000e4e0       0x22 binaries/main.o
+ .debug_macro   0x0000e502       0x79 binaries/neo_threads.o
+ .debug_macro   0x0000e57b       0xda binaries/startup.o
+ .debug_macro   0x0000e655      0x11c binaries/system_core.o
 
-.debug_line     0x00000000      0xf5c
- .debug_line    0x00000000      0x414 binaries/main.o
- .debug_line    0x00000414      0x41c binaries/neo_threads.o
- .debug_line    0x00000830      0x384 binaries/startup.o
- .debug_line    0x00000bb4      0x3a8 binaries/system_core.o
+.debug_line     0x00000000      0xdce
+ .debug_line    0x00000000      0x412 binaries/main.o
+ .debug_line    0x00000412      0x28d binaries/neo_threads.o
+ .debug_line    0x0000069f      0x384 binaries/startup.o
+ .debug_line    0x00000a23      0x3ab binaries/system_core.o
 
-.debug_str      0x00000000    0x52502
- .debug_str     0x00000000    0x52502 binaries/main.o
-                              0x51e37 (size before relaxing)
- .debug_str     0x00052502    0x4f408 binaries/neo_threads.o
- .debug_str     0x00052502    0x4ee7d binaries/startup.o
- .debug_str     0x00052502    0x4f499 binaries/system_core.o
+.debug_str      0x00000000    0x523a0
+ .debug_str     0x00000000    0x523a0 binaries/main.o
+                              0x51da6 (size before relaxing)
+ .debug_str     0x000523a0     0x3dcc binaries/neo_threads.o
+ .debug_str     0x000523a0    0x4ee7d binaries/startup.o
+ .debug_str     0x000523a0    0x4f499 binaries/system_core.o
 
-.debug_frame    0x00000000      0x2a0
- .debug_frame   0x00000000       0x70 binaries/main.o
- .debug_frame   0x00000070       0xd8 binaries/neo_threads.o
- .debug_frame   0x00000148       0x70 binaries/startup.o
- .debug_frame   0x000001b8       0xe8 binaries/system_core.o
+.debug_frame    0x00000000      0x200
+ .debug_frame   0x00000000       0x6c binaries/main.o
+ .debug_frame   0x0000006c       0x3c binaries/neo_threads.o
+ .debug_frame   0x000000a8       0x70 binaries/startup.o
+ .debug_frame   0x00000118       0xe8 binaries/system_core.o
