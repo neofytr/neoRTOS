@@ -8,8 +8,12 @@
 
 #define PIN5 5
 
+neo_thread_t thread_one;
+neo_thread_t thread_two;
+
 /* This kernel works currently only without the floating-point hardware being enabled */
 
+uint32_t thread_two_stack[40];
 void thread_two_fxn(void *arg)
 {
     (int *)arg++;
@@ -34,6 +38,7 @@ void thread_two_fxn(void *arg)
     }
 }
 
+uint32_t thread_one_stack[40];
 void thread_one_fxn(void *arg)
 {
     (int *)arg++;
@@ -65,5 +70,11 @@ int main(void)
     LED_setup();
     neo_kernel_init();
 
-    thread_one_fxn(NULL);
+    neo_thread_init(&thread_one, thread_one_fxn, NULL, (uint8_t *)thread_one_stack, 4 * 40);
+    neo_thread_init(&thread_two, thread_two_fxn, NULL, (uint8_t *)thread_two_stack, 4 * 40);
+
+    neo_start_threads();
+
+    while (1)
+        ;
 }
