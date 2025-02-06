@@ -10,4 +10,6 @@ typedef struct
 } neo_thread_t;
 
 bool neo_thread_start(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg, uint8_t *stack, uint32_t stack_size); // stack size in bytes
-void thread_handler();
+void neo_kernel_init(void);
+void neo_thread_scheduler(void);
+void thread_handler(void);

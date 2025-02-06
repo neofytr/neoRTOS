@@ -4,55 +4,30 @@
 #define PROCESSOR_MODE_BIT (24U)
 #define MAX_THREADS (4)
 
-static volatile neo_thread_t *thread_queue[MAX_THREADS];
+/* Make the variables accessed inside interrupt handlers volatile */
+static neo_thread_t *volatile thread_queue[MAX_THREADS]; // this makes the pointer volatile; placing volatile before the type name will make the contents of the pointer volatile
 static volatile uint8_t thread_queue_index;
+
+neo_thread_t *volatile nex_thread;
+neo_thread_t *volatile curr_thread;
 
 #define TIME_PER_THREAD 1000
 
 static volatile uint8_t last_thread_start_ticks;
 static volatile uint8_t running_thread_index;
 
-/* __attribute__((naked)) void thread_handler(void)
+__attribute__((naked)) void thread_handler(void)
 {
-    static bool first_thread_started = false;
+    __asm__ volatile("b neo_thread_scheduler \n");
+}
 
-    if (!first_thread_started && thread_queue_index > 0)
-    {
-        // Start first thread
-        first_thread_started = true;
-        running_thread_index = 0;
-        last_thread_start_ticks = get_tick_count();
-        __asm__ volatile("ldr sp, [%0]"
-                         :
-                         : "r"(&thread_queue[0]->stack_ptr)
-                         : "memory");
-        return;
-    }
+void neo_thread_scheduler(void)
+{
+}
 
-    if (thread_queue_index &&
-        TIME_PER_THREAD <= get_tick_count() - last_thread_start_ticks)
-    {
-        // Save current thread state
-        __asm__ volatile("str sp, [%0]"
-                         :
-                         : "r"(&thread_queue[running_thread_index]->stack_ptr)
-                         : "memory");
-
-        // Switch to next thread
-        running_thread_index = (running_thread_index + 1) & (MAX_THREADS - 1);
-        if (running_thread_index >= thread_queue_index)
-        {
-            running_thread_index = 0;
-        }
-        __asm__ volatile("ldr sp, [%0]"
-                         :
-                         : "r"(&thread_queue[running_thread_index]->stack_ptr)
-                         : "memory");
-        last_thread_start_ticks = get_tick_count();
-    }
-    __asm__ volatile("ldr lr, =0xFFFFFFF9");
-    __asm__ volatile("bx lr \n");
-} */
+void PendSV_handler(void)
+{
+}
 
 bool init_thread(neo_thread_t *thread, void (*thread_function)(void *arg), void *thread_function_arg, uint8_t *stack, uint32_t stack_size)
 {
