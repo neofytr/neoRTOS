@@ -12,6 +12,8 @@ static volatile uint8_t thread_queue_index;
 static volatile uint8_t curr_thread_index;
 static volatile uint8_t next_thread_index;
 
+static volatile uint32_t last_start = 0;
+
 #define TIME_PER_THREAD 1000
 
 __attribute__((naked)) void thread_handler(void)
@@ -22,8 +24,27 @@ __attribute__((naked)) void thread_handler(void)
     __enable_irq();
 }
 
-void neo_thread_scheduler(void)
+__attribute((naked)) void neo_kernel_init(void)
 {
+    NVIC_SetPriority(PendSV_IRQn, 0xFFFF);
+}
+
+void neo_thread_scheduler(void) // disable interrupts before calling this function
+{
+    if (!last_start)
+    {
+        last_start = get_tick_count();
+        next_thread_index = 0;
+        return;
+    }
+
+    if (has_time_passed(TIME_PER_THREAD, last_start))
+    {
+        last_start = get_tick_count();
+        next_thread_index = (curr_thread_index + 1) & (MAX_THREADS - 1);
+    }
+
+    NVIC_SetPendingIRQ(PendSV_IRQn);
 }
 
 void PendSV_handler(void)
