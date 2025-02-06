@@ -1,3 +1,6 @@
+#ifndef SYSTEM_CORE_H
+#define SYSTEM_CORE_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -71,3 +74,5 @@ void LED_setup(void);
 bool has_time_passed(uint32_t time, uint32_t start_tick_count);
 
 void thread_handler(void);
+
+#endif

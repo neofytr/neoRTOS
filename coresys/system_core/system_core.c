@@ -40,10 +40,12 @@ __attribute__((naked)) void SysTick_handler(void)
 {
     /* LR is loaded with EXC_RETURN upon exception entry; this must be popped into PC to return from exception properlyi */
     __asm__ volatile(
-        "ldr r0, =tick_count   \n"  // Load address of tick_count
-        "ldr r1, [r0]          \n"  // Load tick_count value
-        "add r1, r1, #1        \n"  // Increment tick_count
-        "str r1, [r0]          \n"  // Store updated value back
+        "cpsid i \n"
+        "ldr r0, =tick_count   \n" // Load address of tick_count
+        "ldr r1, [r0]          \n" // Load tick_count value
+        "add r1, r1, #1        \n" // Increment tick_count
+        "str r1, [r0]          \n" // Store updated value back
+        "cpsie i \n"
         "push {lr}             \n"  // Save LR to stack; required for exception return (EXC_RETURN)
         "bl thread_handler      \n" // Branch with link to thread handler
         "pop {lr}              \n"  // Restore LR from stack; required for exception return (EXC_RETURN)
