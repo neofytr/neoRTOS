@@ -40,6 +40,7 @@ __attribute__((naked)) void SysTick_handler(void)
 {
     /* LR is loaded with EXC_RETURN upon exception entry; this must be popped into PC to return from exception properlyi */
     __asm__ volatile(
+        ".global is_first_time \n"
         ".global exit_from_interrupt_ \n"
         "cpsid i \n"
         "ldr r0, =tick_count   \n" // Load address of tick_count

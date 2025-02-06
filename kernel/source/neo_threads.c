@@ -196,7 +196,7 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void
     *(--ptr) = 0;                         // R1
     *(--ptr) = (uint32_t)thread_arg;      // R0 - First argument
 
-    for (int i = 0; i < 8; i++)
+    for (volatile int i = 0; i < 8; i++) // volatile or the compiler optimizes it to a memset; a function i have not defined in system_calls.c
     {
         *(--ptr) = 0; // R4-R11
     }

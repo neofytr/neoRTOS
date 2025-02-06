@@ -16,50 +16,16 @@ neo_thread_t thread_two;
 uint32_t thread_two_stack[40];
 void thread_two_fxn(void *arg)
 {
-    (int *)arg++;
-    uint32_t start = get_tick_count();
-    bool is_on = false;
     while (true)
     {
-        if (has_time_passed(10, start)) // checks if a second is passed since each tick value represents 100 ms
-        {
-            start = get_tick_count();
-            if (is_on)
-            {
-                SET_BIT(GPIOA->BSRR, PIN5 + 16U);
-                is_on = false;
-            }
-            else
-            {
-                SET_BIT(GPIOA->BSRR, PIN5);
-                is_on = true;
-            }
-        }
     }
 }
 
 uint32_t thread_one_stack[40];
 void thread_one_fxn(void *arg)
 {
-    (int *)arg++;
-    uint32_t start = get_tick_count();
-    bool is_on = false;
     while (true)
     {
-        if (has_time_passed(10, start)) // checks for a second
-        {
-            start = get_tick_count();
-            if (is_on)
-            {
-                SET_BIT(GPIOA->BSRR, PIN5 + 16U);
-                is_on = false;
-            }
-            else
-            {
-                SET_BIT(GPIOA->BSRR, PIN5);
-                is_on = true;
-            }
-        }
     }
 }
 
