@@ -63,32 +63,27 @@ void neo_kernel_init(void)
  */
 __attribute__((naked)) void thread_handler(void)
 {
+    // interrupts are already disabled when this function enters
     __asm__ volatile(
         ".extern exit_from_interrupt_\n"
 
         // Check if thread system is started
-        "cpsid i\n" // Disable interrupts
         "ldr r0, =has_threads_started\n"
         "ldr r0, [r0]\n"
-        "cpsie i\n" // Re-enable interrupts
         "cmp r0, #0\n"
         "beq threads_not_started\n"
 
         // Check if this is first execution
-        "cpsid i\n"
         "ldr r0, =is_first_time\n"
         "ldr r0, [r0]\n"
-        "cpsie i\n"
         "cmp r0, #1\n"
         "beq first_time_thread_handler\n"
 
         // Check if time slice has expired
-        "cpsid i\n"
         "ldr r1, =tick_count\n"
         "ldr r1, [r1]\n"
         "ldr r0, =last_thread_start_tick\n"
         "ldr r2, [r0]\n"
-        "cpsie i\n"
         "sub r1, r1, r2\n"
         // HARDCODED ALERT: Update this value if TIME_SLICE_TICKS changes
         "cmp r1, #10\n" // Compare against TIME_SLICE_TICKS
@@ -96,15 +91,14 @@ __attribute__((naked)) void thread_handler(void)
 
         "first_time_thread_handler:\n");
 
-    __disable_irq();
     // Trigger PendSV exception for context switch
     SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
-    __enable_irq();
 
     __asm__ volatile(
         "threads_not_started:\n"
         "thread_time_slice_not_expired:\n"
         "b exit_from_interrupt_\n");
+    // interrupts are enabled when this function exits
 }
 
 /**
@@ -118,7 +112,6 @@ __attribute__((naked)) void PendSV_handler(void)
         "cpsid i\n"
         "ldr r0, =is_first_time\n"
         "ldr r0, [r0]\n"
-        "cpsie i\n"
         "cmp r0, #1\n"
         "beq skip_save\n"
 
@@ -133,6 +126,7 @@ __attribute__((naked)) void PendSV_handler(void)
         "switch:\n"
         // Restore callee-saved registers
         "pop {r4-r11}\n"
+        "cpsie i\n" // enable interrupts again
         "bx lr\n");
 }
 
@@ -142,8 +136,8 @@ __attribute__((naked)) void PendSV_handler(void)
  */
 __attribute__((naked)) void neo_context_switch(void)
 {
+    // interrupts are disabled when this function enters
     __asm__ volatile(
-        "cpsid i\n"
 
         // Check if there are any threads
         "ldr r0, =thread_queue_len\n"
@@ -182,7 +176,6 @@ __attribute__((naked)) void neo_context_switch(void)
         "str r1, [r0]\n"
 
         "2:\n"
-        "cpsie i\n"
         "b switch\n" ::: "r0", "r1", "memory");
 }
 
@@ -192,8 +185,8 @@ __attribute__((naked)) void neo_context_switch(void)
  */
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
+    // interrupts are disabled when this function enters
     __asm__ volatile(
-        "cpsid i\n"
 
         // Check if thread queue is empty
         "ldr r0, =thread_queue_len\n"
@@ -253,8 +246,8 @@ __attribute__((naked)) void neo_thread_scheduler(void)
         "str r1, [r0]\n"
 
         "enable_and_return:\n"
-        "cpsie i\n"
         "b return_from_scheduler\n" ::: "r0", "r1", "r2", "memory");
+    // interrupts are enabled when this function exits
 }
 
 /**

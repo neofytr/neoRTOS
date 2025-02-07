@@ -48,10 +48,10 @@ __attribute__((naked)) void SysTick_handler(void)
         "ldr r1, [r0] \n"        // Load tick_count value
         "add r1, r1, #1 \n"      // Increment tick_count
         "str r1, [r0] \n"        // Store updated value back
-        "cpsie i \n"             // Enable interrupts
         "b thread_handler \n"    // Branch to thread handler
         "exit_from_interrupt_: \n"
-        "bx lr \n" // Return from interrupt
+        "cpsie i \n" // Enable interrupts
+        "bx lr \n"   // Return from interrupt
     );
 }
 
