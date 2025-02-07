@@ -138,47 +138,41 @@ __attribute__((naked)) void PendSV_handler(void)
  */
 __attribute__((naked)) void neo_context_switch(void)
 {
-    // interrupts are disabled when this function enters
     __asm__ volatile(
+        // Load thread_queue_len directly into r3 to check if there are threads
+        "ldr r3, =thread_queue_len\n"
+        "ldr r3, [r3]\n"
+        "cbz r3, 2f\n" // branch if r3 is zero
 
-        // Check if there are any threads
-        "ldr r0, =thread_queue_len\n"
-        "ldr r0, [r0]\n"
-        "cmp r0, #0\n"
-        "beq 2f\n"
+        // Check first time switch (using r3 since we don't need thread_queue_len anymore)
+        "ldr r3, =is_first_time\n"
+        "ldr r3, [r3]\n"
+        "cmp r3, #1\n"
+        "beq 1f\n" // Local forward reference instead of label
 
-        // Check if this is first switch
+        // Save current thread's SP
+        "ldr r2, =thread_queue\n" // Load queue base into r2
+        "ldr r3, =last_running_thread_index\n"
+        "ldr r3, [r3]\n"
+        "ldr r0, [r2, r3, lsl #2]\n" // Use indexed addressing mode
+        "str sp, [r0]\n"             // Store SP directly - stack_ptr is first element
+
+        "1:\n" // first_time_switch
+        // Load new thread's SP
+        "ldr r2, =thread_queue\n" // r2 already has this if not first time
+        "ldr r3, =curr_running_thread_index\n"
+        "ldr r3, [r3]\n"
+        "ldr r0, [r2, r3, lsl #2]\n" // Use indexed addressing mode
+        "ldr sp, [r0]\n"             // Load SP directly - stack_ptr is first element
+
+        // Clear first time flag - only need one register now
         "ldr r0, =is_first_time\n"
-        "ldr r0, [r0]\n"
-        "cmp r0, #1\n"
-        "beq first_time_switch\n"
-
-        // Save current thread's stack pointer
-        "ldr r0, =thread_queue\n"
-        "ldr r1, =last_running_thread_index\n"
-        "ldr r1, [r1]\n"
-        "lsl r1, r1, #2\n" // Multiply by 4 for pointer array indexing
-        "add r0, r0, r1\n"
-        "ldr r0, [r0]\n"
-        "str sp, [r0]\n"
-
-        "first_time_switch:\n"
-        // Load new thread's stack pointer
-        "ldr r0, =thread_queue\n"
-        "ldr r1, =curr_running_thread_index\n"
-        "ldr r1, [r1]\n"
-        "lsl r1, r1, #2\n"
-        "add r0, r0, r1\n"
-        "ldr r0, [r0]\n"
-        "ldr sp, [r0]\n"
-
-        // Clear first time flag
-        "ldr r0, =is_first_time\n"
-        "mov r1, #0\n"
-        "str r1, [r0]\n"
+        "mov r3, #0\n"
+        "str r3, [r0]\n"
 
         "2:\n"
-        "b switch\n" ::: "r0", "r1", "memory");
+        "b switch\n" ::: "r0", "r2", "r3", "memory" // Updated clobber list
+    );
 }
 
 /**
@@ -187,69 +181,59 @@ __attribute__((naked)) void neo_context_switch(void)
  */
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
-    // interrupts are disabled when this function enters
     __asm__ volatile(
+        // Load thread_queue_len and check if empty
+        "ldr r3, =thread_queue_len\n"
+        "ldr r3, [r3]\n"
+        "cbz r3, enable_and_return\n" // Using original label
 
-        // Check if thread queue is empty
-        "ldr r0, =thread_queue_len\n"
-        "ldr r0, [r0]\n"
-        "cmp r0, #0\n"
-        "beq enable_and_return\n"
+        // Check first-time scheduling
+        "ldr r2, =is_first_time\n"
+        "ldr r2, [r2]\n"
+        "cbz r2, main_scheduling_logic\n" // Using original label
 
-        // Handle first-time scheduling
-        "ldr r0, =is_first_time\n"
-        "ldr r0, [r0]\n"
-        "cmp r0, #0\n"
-        "beq main_scheduling_logic\n"
-
-        "ldr r0, =curr_running_thread_index\n"
-        "mov r1, #0\n"
-        "str r1, [r0]\n"
+        // First time initialization
+        "ldr r2, =curr_running_thread_index\n"
+        "mov r3, #0\n"
+        "str r3, [r2]\n"
         "b enable_and_return\n"
 
         "main_scheduling_logic:\n"
-        // Update thread indices
-        "ldr r0, =curr_running_thread_index\n"
-        "ldr r1, [r0]\n"
+        "ldr r2, =curr_running_thread_index\n"
+        "ldr r1, [r2]\n" // Load current index
 
         // Save last running thread
-        "ldr r2, =last_running_thread_index\n"
-        "str r1, [r2]\n"
-
-        // Calculate next thread index
-        "add r1, r1, #1\n"
-        // HARDCODED ALERT: Update this value if MAX_THREADS changes
-        "mov r2, #10\n" // MAX_THREADS value
-        "sub r2, r2, #1\n"
-        "and r1, r1, r2\n"
-
-        // Check if index exceeds queue length
-        "ldr r2, =thread_queue_len\n"
-        "ldr r2, [r2]\n"
-        "cmp r1, r2\n"
-        "blt store_thread_index\n"
-
-        // Reset to beginning of queue
-        "mov r1, #0\n"
-        "str r1, [r0]\n"
         "ldr r0, =last_running_thread_index\n"
-        "mov r1, #1\n"
         "str r1, [r0]\n"
+
+        // Calculate next thread index (r1 = current index)
+        "add r1, #1\n" // Increment
+        // HARDCODE ALERT: Update this value (MAX_THREADS - 1) if MAX_THREADS changes
+        "and r1, #9\n" // Mask with (MAX_THREADS-1) = 9
+
+        // Check if index exceeds queue length (r3 still has queue_len)
+        "cmp r1, r3\n"
+        "blt store_thread_index\n" // Using original label
+
+        // Reset indices if we wrapped around
+        "mov r1, #0\n"   // Reset curr_index to 0
+        "str r1, [r2]\n" // Store curr_index
+        "ldr r2, =last_running_thread_index\n"
+        "mov r1, #1\n"
+        "str r1, [r2]\n"
         "b update_last_thread_start_tick\n"
 
         "store_thread_index:\n"
-        "str r1, [r0]\n"
+        "str r1, [r2]\n" // r2 still points to curr_running_thread_index
 
         "update_last_thread_start_tick:\n"
-        // Update timestamp for next time slice
-        "ldr r0, =tick_count\n"
-        "ldr r1, [r0]\n"
-        "ldr r0, =last_thread_start_tick\n"
-        "str r1, [r0]\n"
+        "ldr r2, =tick_count\n"
+        "ldr r1, [r2]\n"
+        "ldr r2, =last_thread_start_tick\n"
+        "str r1, [r2]\n"
 
         "enable_and_return:\n"
-        "b return_from_scheduler\n" ::: "r0", "r1", "r2", "memory");
-    // interrupts are enabled when this function exits
+        "b return_from_scheduler\n" ::: "r0", "r1", "r2", "r3", "memory");
 }
 
 /**
