@@ -36,7 +36,8 @@ volatile uint32_t is_first_time = 1;             // First context switch flag
 volatile uint32_t has_threads_started = 0;       // Thread system initialization flag
 
 /* Thread Queue Management */
-neo_thread_t volatile *thread_queue[MAX_THREADS];
+neo_thread_t *volatile thread_queue[MAX_THREADS]; // this creates a volatile pointer; the pointer is not volatile, but the data it points to is;
+// if the volatile keyword is placed before the *, then the data the ptr points to is volatile and not the pointer itself; otherwise, if the volatile keyword is placed after the *, then the pointer is volatile and not the data it points to
 volatile uint32_t thread_queue_len = 0;
 
 /**
