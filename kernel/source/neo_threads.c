@@ -108,7 +108,7 @@ __attribute__((naked)) void thread_handler(void)
 __attribute__((naked)) void PendSV_handler(void)
 {
     /* Arm exception execution has tail-chaining in which if one interrupt handler is executed just after another interrupt, the stack pop in the previous handler and stack push in the next handler is skipped */
-    /* This is because the push contents of both the handlers will be the same as no new application code has executed between them; this reduces exception call overhead */
+    /* This is because the push contents of both the handlers will be the same as no new application code has executed between them; this reduces exception call o */
     __asm__ volatile(
         // Check if context save is needed
         "cpsid i\n"
