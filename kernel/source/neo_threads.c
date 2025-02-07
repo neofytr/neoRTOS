@@ -307,7 +307,7 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
     *(--ptr) = (uint32_t)thread_arg;      // R0
 
     // Initialize callee-saved registers
-    for (int i = 0; i < 8; i++)
+    for (volatile int i = 0; i < 8; i++) // without volatile, memset is used which I have not defined
     {
         *(--ptr) = 0; // R11-R4
     }
