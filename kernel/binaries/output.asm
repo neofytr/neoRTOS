@@ -323,7 +323,7 @@ Disassembly of section .text:
  8000352:	e7f0      	b.n	8000336 <reset_handler+0x1a>
  8000354:	20000000 	andcs	r0, r0, r0
  8000358:	20000004 	andcs	r0, r0, r4
- 800035c:	08000480 	stmdaeq	r0, {r7, sl}
+ 800035c:	08000488 	stmdaeq	r0, {r3, r7, sl}
  8000360:	20000194 	mulcs	r0, r4, r1
  8000364:	20000004 	andcs	r0, r0, r4
 
@@ -450,6 +450,18 @@ Disassembly of section .text:
  8000474:	0800018d 	stmdaeq	r0, {r0, r2, r3, r7, r8}
  8000478:	200000a8 	andcs	r0, r0, r8, lsr #1
  800047c:	08000151 	stmdaeq	r0, {r0, r4, r6, r8}
+
+Disassembly of section .init:
+
+08000480 <_init>:
+ 8000480:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+ 8000482:	bf00      	nop
+
+Disassembly of section .fini:
+
+08000484 <_fini>:
+ 8000484:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+ 8000486:	bf00      	nop
 
 Disassembly of section .data:
 

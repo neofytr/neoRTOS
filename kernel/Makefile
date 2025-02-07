@@ -13,6 +13,7 @@ STM_INC_DIR = ../coresys/includes
 CORE_INC_DIR = ../coresys/includes/core
 STARTUP_DIR = $(CORESYS_DIR)/startup
 SYSCALL_DIR = $(CORESYS_DIR)/syscalls
+SYSTEM_CORE_DIR = $(CORESYS_DIR)/system_core
 LINKER_DIR = $(CORESYS_DIR)/linker_script
 OUTPUT_DIR = binaries
 
@@ -72,11 +73,13 @@ LDFLAGS = -T$(LINKER_DIR)/linker_script.ld \
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 STARTUP_SRC = $(STARTUP_DIR)/startup.c
 SYSCALL_SRC = $(SYSCALL_DIR)/syscall.c
+SYSTEM_CORE_SRC = $(SYSTEM_CORE_DIR)/system_core.c
 
 # Object files for both debug and release builds
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OUTPUT_DIR)/%.o)
 STARTUP_OBJ = $(OUTPUT_DIR)/startup.o
 SYSCALL_OBJ = $(OUTPUT_DIR)/syscall.o
+SYSTEM_CORE_OBJ = $(OUTPUT_DIR)/system_core.o
 
 # Default target (release build)
 all: CFLAGS = $(RELEASE_FLAGS)
@@ -95,8 +98,8 @@ $(OUTPUT_DIR)/$(TARGET).asm: $(OUTPUT_DIR)/$(TARGET).elf
 	$(OBJDUMP) -D $< > $@
 
 # Linking object files
-$(OUTPUT_DIR)/$(TARGET).elf: $(OBJS) $(STARTUP_OBJ) $(SYSCALL_OBJ)
-	$(LD) $(OBJS) $(STARTUP_OBJ) $(SYSCALL_OBJ) $(LDFLAGS) -o $@
+$(OUTPUT_DIR)/$(TARGET).elf: $(OBJS) $(STARTUP_OBJ) $(SYSCALL_OBJ) $(SYSTEM_CORE_OBJ)
+	$(LD) $(OBJS) $(STARTUP_OBJ) $(SYSTEM_CORE_OBJ) $(SYSCALL_OBJ) $(LDFLAGS) -o $@
 
 # Compilation rules
 $(OUTPUT_DIR)/%.o: $(SRC_DIR)/%.c
@@ -106,6 +109,9 @@ $(OUTPUT_DIR)/startup.o: $(STARTUP_DIR)/startup.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUT_DIR)/syscall.o: $(SYSCALL_DIR)/syscall.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTPUT_DIR)/system_core.o: $(SYSTEM_CORE_DIR)/system_core.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Utility targets

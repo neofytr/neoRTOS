@@ -4,6 +4,7 @@
 #include "core_cm4.h"
 #include "system_core.h"
 #include "neo_threads.h"
+#include <string.h>
 #include <stdlib.h>
 
 #define PIN5 5
@@ -44,7 +45,7 @@ void thread_one_fxn(void *arg)
     (int *)arg++;
     uint32_t start = get_tick_count();
     bool is_on = false;
-    while (true) 
+    while (true)
     {
         if (has_time_passed(10, start)) // checks for a second
         {
