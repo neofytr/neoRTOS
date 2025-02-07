@@ -64,29 +64,29 @@ void neo_kernel_init(void)
 __attribute__((naked)) void thread_handler(void)
 {
     // interrupts are already disabled when this function enters
+
     __asm__ volatile(
         ".extern exit_from_interrupt_\n"
 
-        // Check if thread system is started
-        "ldr r0, =has_threads_started\n"
-        "ldr r0, [r0]\n"
-        "cmp r0, #0\n"
-        "beq threads_not_started\n"
+        // Check if thread system is started (using r3 to keep value)
+        "ldr r3, =has_threads_started\n"
+        "ldr r3, [r3]\n"
+        "cbz r3, threads_not_started\n" // Use cbz instead of cmp/beq
 
         // Check if this is first execution
-        "ldr r0, =is_first_time\n"
-        "ldr r0, [r0]\n"
-        "cmp r0, #1\n"
+        "ldr r2, =is_first_time\n"
+        "ldr r2, [r2]\n"
+        "cmp r2, #1\n"
         "beq first_time_thread_handler\n"
 
-        // Check if time slice has expired
-        "ldr r1, =tick_count\n"
-        "ldr r1, [r1]\n"
+        // Load tick values and check time slice expiration
+        "ldr r0, =tick_count\n"
+        "ldr r1, [r0]\n" // Current tick in r1
         "ldr r0, =last_thread_start_tick\n"
-        "ldr r2, [r0]\n"
-        "sub r1, r1, r2\n"
-        // HARDCODED ALERT: Update this value if TIME_SLICE_TICKS changes
-        "cmp r1, #10\n" // Compare against TIME_SLICE_TICKS
+        "ldr r0, [r0]\n"   // Last start tick in r0
+        "sub r1, r1, r0\n" // Calculate elapsed ticks
+                           // HARDCODED ALERT: Update this value if TIME_SLICE_TICKS changes
+        "cmp r1, #10\n"    // Compare against TIME_SLICE_TICKS
         "blt thread_time_slice_not_expired\n"
 
         "first_time_thread_handler:\n");
@@ -121,8 +121,10 @@ __attribute__((naked)) void PendSV_handler(void)
         "push {r4-r11}\n"
 
         "skip_save:\n"
+        // we now schedule which thread to run next
         "b neo_thread_scheduler\n"
         "return_from_scheduler:\n"
+        // actual context switch happens from here in the neo_context_switch function
         "b neo_context_switch\n"
 
         "switch:\n"
