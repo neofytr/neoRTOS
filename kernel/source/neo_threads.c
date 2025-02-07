@@ -46,7 +46,13 @@ volatile uint32_t thread_queue_len = 0;
 void neo_kernel_init(void)
 {
     setup_systick(TIME_SLICE_MS); // Configure system tick for thread time slicing
-    NVIC_EnableIRQ(PendSV_IRQn);  // Enable PendSV for context switching
+    __disable_irq();
+    NVIC_EnableIRQ(PendSV_IRQn); // Enable PendSV for context switching
+    // setting PendSV to the lowest priority; this is so that context switch happens when all interrupts are done
+    NVIC_SetPriority(PendSV_IRQn, LOWEST_PRIORITY); // setting priority to 0xFF; it will still be set to 0xF0 since STM32 only implements 4 MSB bits for priority
+    // by default, the priority of SysTick is set to 0x00; we set it here manually anyway
+    NVIC_SetPriority(SysTick_IRQn, 0x00); // setting priority to 0x00
+    __enable_irq();
 }
 
 /**
@@ -324,6 +330,5 @@ void neo_start_threads(void)
 {
     __disable_irq();
     has_threads_started = 1;
-    NVIC_SetPriority(PendSV_IRQn, LOWEST_PRIORITY);
     __enable_irq();
 }
