@@ -1,5 +1,19 @@
 #include "neo_threads.h"
 
+/* TODO */
+// Somehow use PSP and MSP?
+// Implement thread states (ACTIVE, SLEEPING, etc.)
+// Implement thread priority
+// Implement thread mutexes
+// Implement thread semaphores
+// Implement thread message queues
+// Implement switching CPU states (from handler to thread (user)) and vice versa; This requires modifying LR with different EXC_RETURN values before returning from the interrupt
+// Implement thread sleep function
+// Implement thread yield function
+// Implement thread join function
+// Implement thread exit function
+// Implement starting thread from whereever we want
+
 /* Configuration Constants
  * NOTE: If you modify these values, you must also update the corresponding
  * hardcoded values in the assembly code sections marked with "HARDCODED ALERT"
