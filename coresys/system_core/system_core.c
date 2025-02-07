@@ -10,6 +10,8 @@
  * The system operates at 16MHz by default and configures SysTick for millisecond precision timing.
  */
 
+/* Avoid the use of stack in exception handlers */
+
 #include "system_core.h"
 #include "core_cm4.h"
 

@@ -1,220 +1,260 @@
 #include "neo_threads.h"
 
-#define TIME_SLICE (10U) // 1 second time slice to each thread
+/* Configuration Constants
+ * NOTE: If you modify these values, you must also update the corresponding
+ * hardcoded values in the assembly code sections marked with "HARDCODED ALERT"
+ */
+#define TIME_SLICE_MS (100U)     // Base time slice in milliseconds
+#define TIME_SLICE_TICKS (10U)   // Number of ticks before thread switch (1 second total)
+#define MAX_THREADS (10U)        // Maximum number of concurrent threads
+#define PROCESSOR_MODE_BIT (24U) // Processor mode control bit position
+#define STACK_ALIGNMENT (8U)     // Required stack alignment in bytes (AAPCS standard)
+#define PENDSV_IRQ_NUM (14U)     // PendSV interrupt number
+#define LOWEST_PRIORITY (0xFFU)  // Lowest interrupt priority for PendSV
 
-volatile uint32_t last_thread_start_tick;
+/* Thread Management State
+ * volatile qualifier used for variables accessed from both main code and ISRs
+ */
+volatile uint32_t last_thread_start_tick;        // Timestamp of last thread switch
+volatile uint32_t last_running_thread_index = 0; // Index of previously running thread
+volatile uint32_t curr_running_thread_index = 0; // Index of currently running thread
+volatile uint32_t is_first_time = 1;             // First context switch flag
+volatile uint32_t has_threads_started = 0;       // Thread system initialization flag
 
-volatile uint32_t last_running_thread_index = 0;
-volatile uint32_t curr_running_thread_index = 0;
-
-volatile uint32_t is_first_time = 1;
-
-volatile uint32_t has_threads_started = 0;
-
-#define MAX_THREADS (10U)
-#define PROCESSOR_MODE_BIT (24U)
+/* Thread Queue Management */
 neo_thread_t volatile *thread_queue[MAX_THREADS];
-uint32_t thread_queue_len = 0;
+volatile uint32_t thread_queue_len = 0;
 
-void neo_kernel_init()
+/**
+ * @brief Initialize the thread kernel system
+ * Sets up SysTick timer and PendSV interrupt for thread scheduling
+ */
+void neo_kernel_init(void)
 {
-    setup_systick(100); // interrupt every 100 miliseconds
-    // each tick count value represents 100 miliseconds
-    // smallest unit of time measured by system is 100 miliseconds
-    NVIC_EnableIRQ(PendSV_IRQn);
+    setup_systick(TIME_SLICE_MS); // Configure system tick for thread time slicing
+    NVIC_EnableIRQ(PendSV_IRQn);  // Enable PendSV for context switching
 }
 
+/**
+ * @brief Thread system timer handler
+ * Manages thread time slicing and triggers context switches
+ * NOTE: naked attribute prevents compiler from generating prologue/epilogue
+ */
 __attribute__((naked)) void thread_handler(void)
 {
     __asm__ volatile(
-        ".extern exit_from_interrupt_" // external symbol
-        "cpsid i \n"
-        "ldr r0, =has_threads_started \n"
-        "ldr r0, [r0] \n"
-        "cpsie i \n"
-        "cmp r0, #0 \n"
-        "beq threads_not_started \n"
+        ".extern exit_from_interrupt_\n"
 
-        "cpsid i \n"
-        "ldr r0, =is_first_time \n"
-        "ldr r0, [r0] \n"
-        "cpsie i \n"
-        "cmp r0, #1 \n"
-        "beq first_time_thread_handler \n"
+        // Check if thread system is started
+        "cpsid i\n" // Disable interrupts
+        "ldr r0, =has_threads_started\n"
+        "ldr r0, [r0]\n"
+        "cpsie i\n" // Re-enable interrupts
+        "cmp r0, #0\n"
+        "beq threads_not_started\n"
 
-        "cpsid i \n"
-        "ldr r1, =tick_count \n"
-        "ldr r1, [r1] \n"
-        "ldr r0, =last_thread_start_tick \n"
-        "ldr r2, [r0] \n"
-        "cpsie i \n"
-        "sub r1, r1, r2 \n"
-        "cmp r1, #10 \n"
-        "blt thread_time_slice_not_expired \n"
+        // Check if this is first execution
+        "cpsid i\n"
+        "ldr r0, =is_first_time\n"
+        "ldr r0, [r0]\n"
+        "cpsie i\n"
+        "cmp r0, #1\n"
+        "beq first_time_thread_handler\n"
 
-        "first_time_thread_handler:   \n");
+        // Check if time slice has expired
+        "cpsid i\n"
+        "ldr r1, =tick_count\n"
+        "ldr r1, [r1]\n"
+        "ldr r0, =last_thread_start_tick\n"
+        "ldr r2, [r0]\n"
+        "cpsie i\n"
+        "sub r1, r1, r2\n"
+        // HARDCODED ALERT: Update this value if TIME_SLICE_TICKS changes
+        "cmp r1, #10\n" // Compare against TIME_SLICE_TICKS
+        "blt thread_time_slice_not_expired\n"
 
-#define PendSV_Interrupt_Number (14U)
+        "first_time_thread_handler:\n");
 
-    // Writing 1 to this bit is the only way to set the PendSV exception state to pending.
-    SCB->ICSR |= (1U << (2 * PendSV_Interrupt_Number)); // trigger PendSV exception
-
-#undef PendSV_Interrupt_Number
+    __disable_irq();
+    // Trigger PendSV exception for context switch
+    SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
+    __enable_irq();
 
     __asm__ volatile(
-        "threads_not_started: \n"
-        "thread_time_slice_not_expired: \n"
-        "b exit_from_interrupt_ \n");
+        "threads_not_started:\n"
+        "thread_time_slice_not_expired:\n"
+        "b exit_from_interrupt_\n");
 }
 
+/**
+ * @brief PendSV exception handler for context switching
+ * Saves and restores thread contexts
+ */
 __attribute__((naked)) void PendSV_handler(void)
 {
     __asm__ volatile(
-        "cpsid i \n"
-        "ldr r0, =is_first_time \n"
-        "ldr r0, [r0] \n"
-        "cpsie i \n"
-        "cmp r0, #1 \n"
-        "beq skip_save \n"
-        "push {r4-r11} \n"
+        // Check if context save is needed
+        "cpsid i\n"
+        "ldr r0, =is_first_time\n"
+        "ldr r0, [r0]\n"
+        "cpsie i\n"
+        "cmp r0, #1\n"
+        "beq skip_save\n"
 
-        "skip_save: \n"
-        "b neo_thread_scheduler \n"
-        "return_from_scheduler: \n"
-        "b neo_context_switch \n"
+        // Save registers R4-R11 (callee-saved registers)
+        "push {r4-r11}\n"
 
-        "switch: \n"
-        // After switch, restore R4-R11
-        "pop {r4-r11} \n"
+        "skip_save:\n"
+        "b neo_thread_scheduler\n"
+        "return_from_scheduler:\n"
+        "b neo_context_switch\n"
 
-        "bx lr \n");
+        "switch:\n"
+        // Restore callee-saved registers
+        "pop {r4-r11}\n"
+        "bx lr\n");
 }
 
+/**
+ * @brief Performs the actual context switch between threads
+ * Handles stack pointer updates and thread state transitions
+ */
 __attribute__((naked)) void neo_context_switch(void)
 {
     __asm__ volatile(
-        "cpsid i \n"
+        "cpsid i\n"
 
-        "ldr r0, =thread_queue_len \n"
-        "ldr r0, [r0] \n"
-        "cmp r0, #0 \n"
-        "beq 2f \n"
+        // Check if there are any threads
+        "ldr r0, =thread_queue_len\n"
+        "ldr r0, [r0]\n"
+        "cmp r0, #0\n"
+        "beq 2f\n"
 
-        "ldr r0, =is_first_time \n"
-        "ldr r0, [r0] \n"
-        "cmp r0, #1 \n"
-        "beq first_time_switch \n"
+        // Check if this is first switch
+        "ldr r0, =is_first_time\n"
+        "ldr r0, [r0]\n"
+        "cmp r0, #1\n"
+        "beq first_time_switch\n"
 
-        // Save current SP to thread_queue[last_running_thread_index]
-        "ldr r0, =thread_queue \n"
-        "ldr r1, =last_running_thread_index \n"
-        "ldr r1, [r1] \n"
-        "lsl r1, r1, #2 \n" // Multiply by 4 for pointer array index
-        "add r0, r0, r1 \n"
-        "ldr r0, [r0] \n" // Load the thread pointer
-        "str sp, [r0] \n"
+        // Save current thread's stack pointer
+        "ldr r0, =thread_queue\n"
+        "ldr r1, =last_running_thread_index\n"
+        "ldr r1, [r1]\n"
+        "lsl r1, r1, #2\n" // Multiply by 4 for pointer array indexing
+        "add r0, r0, r1\n"
+        "ldr r0, [r0]\n"
+        "str sp, [r0]\n"
 
-        "first_time_switch: \n"
-        // Load SP from thread_queue[curr_running_thread_index]
-        "ldr r0, =thread_queue \n"
-        "ldr r1, =curr_running_thread_index \n"
-        "ldr r1, [r1] \n"
-        "lsl r1, r1, #2 \n" // Multiply by 4 for pointer array index
-        "add r0, r0, r1 \n"
-        "ldr r0, [r0] \n" // Load the thread pointer
-        "ldr sp, [r0] \n"
-        "ldr r0, =is_first_time \n"
-        "mov r1, #0 \n"
-        "str r1, [r0] \n"
+        "first_time_switch:\n"
+        // Load new thread's stack pointer
+        "ldr r0, =thread_queue\n"
+        "ldr r1, =curr_running_thread_index\n"
+        "ldr r1, [r1]\n"
+        "lsl r1, r1, #2\n"
+        "add r0, r0, r1\n"
+        "ldr r0, [r0]\n"
+        "ldr sp, [r0]\n"
 
-        "2: \n"
-        "cpsie i \n"
-        "b switch \n" ::: "r0", "r1", "memory");
+        // Clear first time flag
+        "ldr r0, =is_first_time\n"
+        "mov r1, #0\n"
+        "str r1, [r0]\n"
+
+        "2:\n"
+        "cpsie i\n"
+        "b switch\n" ::: "r0", "r1", "memory");
 }
 
-// __attribute__((naked)) means no stack usage and only scratch registers used
-
+/**
+ * @brief Thread scheduler implementation
+ * Determines which thread should run next based on round-robin scheduling
+ */
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
-    __asm volatile(
-        // Disable interrupts
-        "cpsid i                                \n\t"
+    __asm__ volatile(
+        "cpsid i\n"
 
-        // Check if thread_queue_len is zero
-        "ldr r0, =thread_queue_len             \n\t"
-        "ldr r0, [r0]                          \n\t"
-        "cmp r0, #0                            \n\t"
-        "beq enable_and_return                 \n\t" // Jump to enable_and_return if zero
+        // Check if thread queue is empty
+        "ldr r0, =thread_queue_len\n"
+        "ldr r0, [r0]\n"
+        "cmp r0, #0\n"
+        "beq enable_and_return\n"
 
-        // Check if is_first_time
-        "ldr r0, =is_first_time                \n\t"
-        "ldr r0, [r0]                          \n\t"
-        "cmp r0, #0                            \n\t"
-        "beq main_scheduling_logic             \n\t" // If not first time, continue to main logic
+        // Handle first-time scheduling
+        "ldr r0, =is_first_time\n"
+        "ldr r0, [r0]\n"
+        "cmp r0, #0\n"
+        "beq main_scheduling_logic\n"
 
-        // Handle first time case
-        "ldr r0, =curr_running_thread_index    \n\t"
-        "mov r1, #0                            \n\t"
-        "str r1, [r0]                          \n\t"
-        "b enable_and_return                   \n\t" // Jump to enable_and_return
+        "ldr r0, =curr_running_thread_index\n"
+        "mov r1, #0\n"
+        "str r1, [r0]\n"
+        "b enable_and_return\n"
 
-        // Main scheduling logic
-        "main_scheduling_logic:                 \n\t"
-        "ldr r0, =curr_running_thread_index    \n\t"
-        "ldr r1, [r0]                          \n\t"
+        "main_scheduling_logic:\n"
+        // Update thread indices
+        "ldr r0, =curr_running_thread_index\n"
+        "ldr r1, [r0]\n"
 
-        // Save last running thread index
-        "ldr r2, =last_running_thread_index    \n\t"
-        "str r1, [r2]                          \n\t"
+        // Save last running thread
+        "ldr r2, =last_running_thread_index\n"
+        "str r1, [r2]\n"
 
-        // Increment and mask current thread index
-        "add r1, r1, #1                        \n\t"
-        "mov r2, #10                  \n\t" // MAX_THREADS used here, change if ever change the macro MAX_THREADS
-        "sub r2, r2, #1                        \n\t"
-        "and r1, r1, r2                        \n\t"
+        // Calculate next thread index
+        "add r1, r1, #1\n"
+        // HARDCODED ALERT: Update this value if MAX_THREADS changes
+        "mov r2, #10\n" // MAX_THREADS value
+        "sub r2, r2, #1\n"
+        "and r1, r1, r2\n"
 
-        // Check if current index >= thread_queue_len
-        "ldr r2, =thread_queue_len             \n\t"
-        "ldr r2, [r2]                          \n\t"
-        "cmp r1, r2                            \n\t"
-        "blt store_thread_index                \n\t"
+        // Check if index exceeds queue length
+        "ldr r2, =thread_queue_len\n"
+        "ldr r2, [r2]\n"
+        "cmp r1, r2\n"
+        "blt store_thread_index\n"
 
-        // Reset indices if we went past thread_queue_len
-        "mov r1, #0                            \n\t"
-        "str r1, [r0]                          \n\t"
-        "ldr r0, =last_running_thread_index    \n\t"
-        "mov r1, #1                            \n\t"
-        "str r1, [r0]                          \n\t"
-        "b update_last_thread_start_tick       \n\t"
+        // Reset to beginning of queue
+        "mov r1, #0\n"
+        "str r1, [r0]\n"
+        "ldr r0, =last_running_thread_index\n"
+        "mov r1, #1\n"
+        "str r1, [r0]\n"
+        "b update_last_thread_start_tick\n"
 
-        // Store new current thread index if within bounds
-        "store_thread_index:                    \n\t"
-        "str r1, [r0]                          \n\t"
+        "store_thread_index:\n"
+        "str r1, [r0]\n"
 
-        // Update last_thread_start_tick
-        "update_last_thread_start_tick:        \n\t"
-        "ldr r0, =tick_count                   \n\t"
-        "ldr r1, [r0]                          \n\t"
-        "ldr r0, =last_thread_start_tick       \n\t"
-        "str r1, [r0]                          \n\t"
+        "update_last_thread_start_tick:\n"
+        // Update timestamp for next time slice
+        "ldr r0, =tick_count\n"
+        "ldr r1, [r0]\n"
+        "ldr r0, =last_thread_start_tick\n"
+        "str r1, [r0]\n"
 
-        // Enable interrupts and return
-        "enable_and_return:                     \n\t"
-        "cpsie i                               \n\t"
-        "b return_from_scheduler                                \n\t"
-
-        ::: "r0", "r1", "r2", "memory");
+        "enable_and_return:\n"
+        "cpsie i\n"
+        "b return_from_scheduler\n" ::: "r0", "r1", "r2", "memory");
 }
 
-bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void *thread_arg, uint8_t *stack, uint32_t stack_size) // stack_size is in bytes
+/**
+ * @brief Initialize a new thread
+ * @param thread Pointer to thread structure
+ * @param thread_function Thread entry point function
+ * @param thread_arg Argument passed to thread function
+ * @param stack Pointer to thread's stack memory
+ * @param stack_size Size of stack in bytes
+ * @return true if initialization successful, false otherwise
+ */
+bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
+                     void *thread_arg, uint8_t *stack, uint32_t stack_size)
 {
+    // Validate parameters
     if (!thread || !thread_function || !stack)
     {
         return false;
     }
 
-    // the thread function should NEVER return
-
+    // Check thread limit
     __disable_irq();
     if (thread_queue_len >= MAX_THREADS)
     {
@@ -222,62 +262,54 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void
         return false;
     }
 
+    // Add thread to queue
     thread_queue[thread_queue_len++] = thread;
     __enable_irq();
 
-    thread->stack_ptr = (uint8_t *)(((uintptr_t)stack + stack_size) & 0xFFFFFFF8U); // downward alignment of stack ptr to 8 bytes (required by AAPCS standard and execution stack)
+    // Align stack pointer to 8-byte boundary (AAPCS requirement)
+    thread->stack_ptr = (uint8_t *)(((uintptr_t)stack + stack_size) & ~(STACK_ALIGNMENT - 1));
     uint32_t *ptr = (uint32_t *)thread->stack_ptr;
 
     /*
-     * Stack frame setup for context switching:
+     * Initialize Thread Stack Frame
      *
-     * When an exception occurs, ARM automatically pushes core registers onto the stack.
-     * We manually pre-initialize this "exception stack frame" to control where the thread starts.
-     *
-     * Stack grows downward, so we push in reverse order of exception entry:
-     *
-     * Lower addr
-     * R4-R11: Preserved registers not auto-saved
-     * R0: thread_arg (parameter for thread_function)
-     * R1-R3: Dummy values (would be parameters)
-     * R12: Scratch register
-     * LR: Return address (set to a cleanup function)
-     * PC: thread_function (where execution starts)
-     * xPSR: Program status (Thumb bit set)
-     * Higher addr
-     *
-     * When the scheduler performs a context switch:
-     * 1. It loads this pre-built stack frame using exception return
-     * 2. CPU pops PC - switches to thread_function
-     * 3. thread_function executes with thread_arg in R0
-     * 4. If thread_function returns, LR points to cleanup
+     * Stack layout (from high to low address):
+     * - xPSR: Program Status Register (Thumb bit set)
+     * - PC: Program Counter (thread_function)
+     * - LR: Link Register (unused as thread shouldn't return)
+     * - R12: General Purpose Register
+     * - R3-R1: Parameter Registers (unused)
+     * - R0: First Parameter Register (thread_arg)
+     * - R11-R4: Callee-saved Registers
      */
 
-    // Arm stack is a full stack and little endian (by default); stack_ptr points to the first byte (least significant byte) of the last item pushed onto the stack
-
-    *(--ptr) = 0x01000000;                // xPSR (thumb bit set)
+    *(--ptr) = 0x01000000;                // xPSR (Thumb bit)
     *(--ptr) = (uint32_t)thread_function; // PC
-    *(--ptr) = (uint32_t)0;               // LR; thread never returns so we don't bother with the LR of the thread function
+    *(--ptr) = 0;                         // LR
     *(--ptr) = 0;                         // R12
     *(--ptr) = 0;                         // R3
     *(--ptr) = 0;                         // R2
     *(--ptr) = 0;                         // R1
-    *(--ptr) = (uint32_t)thread_arg;      // R0 - First argument
+    *(--ptr) = (uint32_t)thread_arg;      // R0
 
-    for (volatile int i = 0; i < 8; i++) // volatile or the compiler optimizes it to a memset; a function i have not defined in system_calls.c
+    // Initialize callee-saved registers
+    for (int i = 0; i < 8; i++)
     {
-        *(--ptr) = 0; // R4-R11
+        *(--ptr) = 0; // R11-R4
     }
 
     thread->stack_ptr = (uint8_t *)ptr;
-
     return true;
 }
 
+/**
+ * @brief Start the thread system
+ * Enables threading and sets up final configurations
+ */
 void neo_start_threads(void)
 {
     __disable_irq();
     has_threads_started = 1;
-    NVIC_SetPriority(PendSV_IRQn, 0xFF); // give lowest priority to PendSV; useful for context switching
+    NVIC_SetPriority(PendSV_IRQn, LOWEST_PRIORITY);
     __enable_irq();
 }
