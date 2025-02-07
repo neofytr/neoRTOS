@@ -19,10 +19,12 @@ void thread_two_fxn(void *arg)
 {
     (int *)arg++;
     uint32_t start = get_tick_count();
+    bool block_once = true;
+
     bool is_on = false;
     while (true)
     {
-        if (has_time_passed(10, start)) // checks if a second is passed since each tick value represents 100 ms
+        if (has_time_passed(5, start)) // checks if a second is passed since each tick value represents 100 ms
         {
             start = get_tick_count();
             if (is_on)
@@ -36,6 +38,12 @@ void thread_two_fxn(void *arg)
                 is_on = true;
             }
         }
+
+        if (block_once)
+        {
+            block_once = false;
+            neo_thread_sleep(30); // blocks for 2 seconds
+        }
     }
 }
 
@@ -45,9 +53,10 @@ void thread_one_fxn(void *arg)
     (int *)arg++;
     uint32_t start = get_tick_count();
     bool is_on = false;
+    bool block_once = true;
     while (true)
     {
-        if (has_time_passed(10, start)) // checks for a second
+        if (has_time_passed(5, start)) 
         {
             start = get_tick_count();
             if (is_on)
@@ -60,6 +69,12 @@ void thread_one_fxn(void *arg)
                 SET_BIT(GPIOA->BSRR, PIN5);
                 is_on = true;
             }
+        }
+
+        if (block_once)
+        {
+            block_once = false;
+            neo_thread_sleep(30); // blocks for 2 seconds
         }
     }
 }

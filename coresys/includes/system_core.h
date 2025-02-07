@@ -8,8 +8,6 @@
 #define CLEAR_BIT(reg, bit) ((reg) &= ~((1UL) << (bit)))
 #define TOGGLE_BIT(reg, bit) ((reg) ^= ((1UL) << (bit)))
 
-static volatile uint32_t tick_count = 0; // global tick counter; each tick measures 1 milisecond passed
-
 /**
  * @brief Initialize and configure the SysTick timer
  *

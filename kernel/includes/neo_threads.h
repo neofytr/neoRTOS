@@ -6,13 +6,23 @@
 #include "system_core.h"
 #include "core_cm4.h"
 
-typedef struct
+typedef enum
+{
+    READY = 0,
+    RUNNING = 1,
+    BLOCKED = 2,
+} neo_thread_state_t;
+
+typedef struct __attribute__((packed))
 {
     uint8_t *stack_ptr;
+    uint32_t sleep_time; // in multiple of 100 ms
+    neo_thread_state_t thread_state; // 1 byte only
 } neo_thread_t;
 
 bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *), void *thread_arg, uint8_t *stack, uint32_t stack_size);
 void neo_kernel_init(void);
+__attribute__((naked)) void neo_thread_sleep(uint32_t time);
 void neo_start_threads(void);
 
 #endif

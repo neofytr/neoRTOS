@@ -26,6 +26,8 @@
 #define PENDSV_IRQ_NUM (14U)     // PendSV interrupt number
 #define LOWEST_PRIORITY (0xFFU)  // Lowest interrupt priority for PendSV
 
+extern volatile uint32_t tick_count;
+
 /* Thread Management State
  * volatile qualifier used for variables accessed from both main code and ISRs
  */
@@ -36,9 +38,22 @@ volatile uint32_t is_first_time = 1;             // First context switch flag
 volatile uint32_t has_threads_started = 0;       // Thread system initialization flag
 
 /* Thread Queue Management */
-neo_thread_t *volatile thread_queue[MAX_THREADS]; // this creates a volatile pointer; the pointer is not volatile, but the data it points to is;
+// extra space for idle thread
+volatile neo_thread_t *volatile thread_queue[MAX_THREADS + 1]; // this creates a volatile pointer; the pointer is not volatile, but the data it points to is;
 // if the volatile keyword is placed before the *, then the data the ptr points to is volatile and not the pointer itself; otherwise, if the volatile keyword is placed after the *, then the pointer is volatile and not the data it points to
 volatile uint32_t thread_queue_len = 0;
+
+#define IDLE_THREAD_STACK_SIZE_IN_32_BITS 20
+volatile uint32_t idle_thread_stack[IDLE_THREAD_STACK_SIZE_IN_32_BITS];
+volatile neo_thread_t idle_thread;
+
+void idle_thread_function(void)
+{
+    while (true)
+    {
+        __asm__ volatile("nop");
+    }
+}
 
 /**
  * @brief Initialize the thread kernel system
@@ -46,13 +61,39 @@ volatile uint32_t thread_queue_len = 0;
  */
 void neo_kernel_init(void)
 {
-    setup_systick(TIME_SLICE_MS); // Configure system tick for thread time slicing
     __disable_irq();
+    setup_systick(TIME_SLICE_MS); // Configure system tick for thread time slicing
+
     NVIC_EnableIRQ(PendSV_IRQn); // Enable PendSV for context switching
     // setting PendSV to the lowest priority; this is so that context switch happens when all interrupts are done
     NVIC_SetPriority(PendSV_IRQn, LOWEST_PRIORITY); // setting priority to 0xFF; it will still be set to 0xF0 since STM32 only implements 4 MSB bits for priority
     // by default, the priority of SysTick is set to 0x00; we set it here manually anyway
     NVIC_SetPriority(SysTick_IRQn, 0x00); // setting priority to 0x00
+
+    thread_queue[MAX_THREADS] = &idle_thread;
+
+    idle_thread.thread_state = READY;
+    idle_thread.stack_ptr = (uint8_t *)(((uintptr_t)idle_thread_stack + IDLE_THREAD_STACK_SIZE_IN_32_BITS * 4) & ~(STACK_ALIGNMENT - 1));
+
+    uint32_t *ptr = (uint32_t *)idle_thread.stack_ptr;
+
+    *(--ptr) = 0x01000000;                     // xPSR (Thumb bit)
+    *(--ptr) = (uint32_t)idle_thread_function; // PC
+    *(--ptr) = 0;                              // LR
+    *(--ptr) = 0;                              // R12
+    *(--ptr) = 0;                              // R3
+    *(--ptr) = 0;                              // R2
+    *(--ptr) = 0;                              // R1
+    *(--ptr) = 0;                              // R0
+
+    // Initialize callee-saved registers
+    for (volatile int i = 0; i < 8; i++) // without volatile, memset is used which I have not defined
+    {
+        *(--ptr) = 0; // R11-R4
+    }
+
+    idle_thread.stack_ptr = (uint8_t *)ptr;
+#undef IDLE_THREAD_STACK_SIZE_IN_32_BITS
     __enable_irq();
 }
 
@@ -64,7 +105,8 @@ void neo_kernel_init(void)
 __attribute__((naked)) void thread_handler(void)
 {
     // interrupts are already disabled when this function enters
-
+    // we will not save the registers r4 to r11 of the current thread in this function; we will save them in the PendSV handler; so we can't clobber them in this function
+    // we can save them in this function though; but we will not do that
     __asm__ volatile(
         ".extern exit_from_interrupt_\n"
 
@@ -79,6 +121,10 @@ __attribute__((naked)) void thread_handler(void)
         "cmp r2, #1\n"
         "beq first_time_thread_handler\n"
 
+        // update sleeping threads
+        "b update_sleeping_threads \n"
+        "return_from_update: \n"
+
         // Load tick values and check time slice expiration
         "ldr r0, =tick_count\n"
         "ldr r1, [r0]\n" // Current tick in r1
@@ -92,7 +138,7 @@ __attribute__((naked)) void thread_handler(void)
         "first_time_thread_handler:\n");
 
     // Trigger PendSV exception for context switch
-    SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
+    SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM)); // will be done just using r0 to r3
 
     __asm__ volatile(
         "threads_not_started:\n"
@@ -120,6 +166,8 @@ __attribute__((naked)) void PendSV_handler(void)
         // Save registers R4-R11 (callee-saved registers)
         "push {r4-r11}\n"
 
+        /* we have now saved the registers r4 to r11; we can clobber them in the subsequent function calls */
+
         "skip_save:\n"
         // we now schedule which thread to run next
         "b neo_thread_scheduler\n"
@@ -140,6 +188,8 @@ __attribute__((naked)) void PendSV_handler(void)
  */
 __attribute__((naked)) void neo_context_switch(void)
 {
+    /* we have now saved the registers r4 to r11; we can clobber them */
+    /* interrupts are disabled before entering this function */
     __asm__ volatile(
         // Load thread_queue_len directly into r3 to check if there are threads
         "ldr r3, =thread_queue_len\n"
@@ -183,59 +233,94 @@ __attribute__((naked)) void neo_context_switch(void)
  */
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
-    __asm__ volatile(
-        // Load thread_queue_len and check if empty
-        "ldr r3, =thread_queue_len\n"
-        "ldr r3, [r3]\n"
-        "cbz r3, enable_and_return\n" // Using original label
+    /* we have now saved the registers r4 to r11; we can clobber them */
+    /* interrupts are disabled before entering this function */
+    // Load thread_queue_len and check if empty
+    if (!thread_queue_len)
+    {
+        goto enable_and_return;
+    }
 
-        // Check first-time scheduling
-        "ldr r2, =is_first_time\n"
-        "ldr r2, [r2]\n"
-        "cbz r2, main_scheduling_logic\n" // Using original label
-
+    // Check first-time scheduling
+    if (!is_first_time)
+    {
+        goto main_scheduling_logic;
+    }
+    else
+    {
         // First time initialization
-        "ldr r2, =curr_running_thread_index\n"
-        "mov r3, #0\n"
-        "str r3, [r2]\n"
-        "b enable_and_return\n"
+        for (uint32_t index = 0; index < thread_queue_len; index++)
+        {
+            if (thread_queue[index]->thread_state == READY)
+            {
+                curr_running_thread_index = index;
+                goto enable_and_return; // run the first ready thread
+            }
+        }
 
-        "main_scheduling_logic:\n"
-        "ldr r2, =curr_running_thread_index\n"
-        "ldr r1, [r2]\n" // Load current index
+        curr_running_thread_index = MAX_THREADS;
+        goto enable_and_return; // no ready threads found
+    }
 
-        // Save last running thread
-        "ldr r0, =last_running_thread_index\n"
-        "str r1, [r0]\n"
+main_scheduling_logic:
+    last_running_thread_index = curr_running_thread_index; // save the index of the thread that was previously running
 
-        // Calculate next thread index (r1 = current index)
-        "add r1, #1\n" // Increment
-        // HARDCODE ALERT: Update this value (MAX_THREADS - 1) if MAX_THREADS changes
-        "and r1, #9\n" // Mask with (MAX_THREADS-1) = 9
+    /* scheduling logic goes here; set curr_running_thread_index here appropriately */
 
-        // Check if index exceeds queue length (r3 still has queue_len)
-        "cmp r1, r3\n"
-        "blt store_thread_index\n" // Using original label
+    if (thread_queue[last_running_thread_index]->thread_state == RUNNING)
+    {
+        thread_queue[last_running_thread_index]->thread_state = READY;
+    }
 
-        // Reset indices if we wrapped around
-        "mov r1, #0\n"   // Reset curr_index to 0
-        "str r1, [r2]\n" // Store curr_index
-        "ldr r2, =last_running_thread_index\n"
-        "mov r1, #1\n"
-        "str r1, [r2]\n"
-        "b update_last_thread_start_tick\n"
+    if (last_running_thread_index == MAX_THREADS) // idle thread was running and now is preempted
+    {
+        for (uint32_t index = 0; index < thread_queue_len; index++)
+        {
+            if (thread_queue[index]->thread_state == READY)
+            {
+                curr_running_thread_index = index;
+                goto enable_and_return;
+            }
+        }
 
-        "store_thread_index:\n"
-        "str r1, [r2]\n" // r2 still points to curr_running_thread_index
+        curr_running_thread_index = MAX_THREADS;
+        goto enable_and_return; // still no ready threads found
+    }
 
-        "update_last_thread_start_tick:\n"
-        "ldr r2, =tick_count\n"
-        "ldr r1, [r2]\n"
-        "ldr r2, =last_thread_start_tick\n"
-        "str r1, [r2]\n"
+    uint32_t curr = curr_running_thread_index;
 
-        "enable_and_return:\n"
-        "b return_from_scheduler\n" ::: "r0", "r1", "r2", "r3", "memory");
+    while (true)
+    {
+        curr_running_thread_index++;
+        if (curr_running_thread_index == MAX_THREADS)
+        {
+            curr_running_thread_index = 0;
+        }
+
+        if (curr_running_thread_index == thread_queue_len)
+        {
+            curr_running_thread_index = 0; // reached the end of the queue first time? go to start
+        }
+
+        if (curr_running_thread_index == curr)
+        {
+            curr_running_thread_index = MAX_THREADS; // no ready threads found; run idle thread
+            goto enable_and_return;
+        }
+
+        if (thread_queue[curr_running_thread_index]->thread_state == READY)
+        {
+            goto enable_and_return;
+        }
+    }
+
+    // curr_running_thread_index = (curr_running_thread_index + 1) & (MAX_THREADS - 1); // round-robin scheduling
+
+enable_and_return:
+    thread_queue[curr_running_thread_index]->thread_state = RUNNING;
+    last_thread_start_tick = tick_count;
+
+    __asm__ volatile("b return_from_scheduler");
 }
 
 /**
@@ -311,6 +396,76 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
 void neo_start_threads(void)
 {
     __disable_irq();
+    for (uint32_t index = 0; index < thread_queue_len; index++)
+    {
+        thread_queue[index]->thread_state = READY;
+    }
     has_threads_started = 1;
     __enable_irq();
+}
+
+__attribute__((naked)) void update_sleeping_threads()
+{
+    // this function is called with interrupts disabled
+    __asm__ volatile(
+        // Initialize index (r0) to 0 and load thread_queue_len into r1
+        "mov r0, #0\n\t"
+        "ldr r1, =thread_queue_len\n\t"
+        "ldr r1, [r1]\n\t"
+        "ldr r2, =thread_queue\n\t"
+
+        // Main loop label
+        "sleeping_threads_loop:\n\t"
+        "cmp r0, r1\n\t"
+        "beq exit_loop\n\t"
+
+        // Load thread pointer
+        "ldr r3, [r2]\n\t" // r3 = thread_queue[index]
+
+        // Check thread state (thread_state is at offset 8)
+        "ldrb r12, [r3, #8]\n\t" // Load thread state as byte
+        "cmp r12, #2\n\t"        // Compare with BLOCKED (2)
+        "bne next_iter\n\t"
+
+        // Update sleep time (sleep_time is at offset 4)
+        "ldr r12, [r3, #4]\n\t" // Load sleep_time
+        "subs r12, #1\n\t"      // Decrement sleep time
+        "str r12, [r3, #4]\n\t" // Store updated sleep time
+
+        // Check if sleep time is 0
+        "cmp r12, #0\n\t"
+        "bne next_iter\n\t"
+
+        // Update thread state to READY (0)
+        "mov r12, #0\n\t"        // READY state
+        "strb r12, [r3, #8]\n\t" // Store byte at thread state offset
+
+        // Increment loop counter and continue
+        "next_iter:\n\t"
+        "add r2, #4\n\t" // Move to next thread pointer
+        "add r0, #1\n\t" // Increment counter
+        "b sleeping_threads_loop\n\t"
+
+        // Exit loop
+        "exit_loop:\n\t"
+        "b return_from_update"
+        :                                         // Output operands
+        :                                         // Input operands
+        : "r0", "r1", "r2", "r3", "r12", "memory" // Clobber list
+    );
+}
+
+/* A subtle problem is that the thread calling sleep gets context switched just before the call; this can lead to the thread waiting more than expected; fundamental flaw */
+__attribute__((naked)) void neo_thread_sleep(uint32_t time)
+{
+    // time is in multiple of 100ms
+    __asm__ volatile("cpsid i \n");
+    // set the thread state to blocked; everytime systick interrupt occurs, all threads that are blocked have their sleep_time decremented by 1
+    thread_queue[curr_running_thread_index]->thread_state = BLOCKED;
+    // set the sleep time of the thread
+    thread_queue[curr_running_thread_index]->sleep_time = time;
+    // trigger context switch
+    SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
+    __asm__ volatile("cpsie i \n"
+                     "bx lr \n");
 }

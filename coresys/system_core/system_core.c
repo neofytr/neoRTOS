@@ -27,8 +27,8 @@
 /* System Clock Definition */
 #define SYS_CLOCK 16000000U /* Default system clock frequency (16MHz) */
 
-/* Global tick counter for timing operations */
-static volatile uint32_t tick_count;
+/* Global tick counter */
+volatile uint32_t tick_count = 0; // global tick counter; each tick measures 1 milisecond passed
 
 /**
  * @brief SysTick interrupt handler
