@@ -13,6 +13,13 @@ void enable_fpu(void);
 extern uint32_t _etext, _sdata, _edata, __bss_start__, __bss_end__, _sidata;
 extern int main(void);
 extern void __libc_init_array(void);
+/*
+
+The CPU is in the privileged state after the reset and the reset handler executes in the
+privileged state; since I don't change the CPU state anytime later (for now atleast), the CPU is executing in
+the privileged state all the time
+
+*/
 
 /* We have not enabled the hardware Floating Point Unit in this startup file; so in the make file,
 software floating point should be used while compiling/linking */
@@ -214,9 +221,9 @@ __attribute__((used)) void reset_handler(void)
     {
         *dst_ptr++ = 0;
     }
-
-    // enable FPU
-    enable_fpu();
+    /*
+        // enable FPU
+        enable_fpu(); */
 
     // call init function of C standard library
 
