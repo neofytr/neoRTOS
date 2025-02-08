@@ -265,22 +265,24 @@ __attribute__((naked)) void neo_thread_scheduler(void)
     /* Handle first-time scheduling initialization */
     if (is_first_time)
     {
-        /* Find first ready thread or default to idle */
-        uint32_t ready_bits = ready_threads_bit_mask & ~(1U << MAX_THREADS);
-        int8_t index;
+        /* Start with the first thread (index 0) */
+        curr_running_thread_index = 0;
 
-        if (ready_bits)
+        /* If thread 0 isn't ready, find the first ready thread */
+        if (!(ready_threads_bit_mask & (1U << 0)))
         {
-            uint32_t clz_result;
-            __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(ready_bits));
-            index = 31 - (int8_t)clz_result;
+            uint32_t ready_bits = ready_threads_bit_mask & ~(1U << MAX_THREADS);
+            if (ready_bits)
+            {
+                uint32_t clz_result;
+                __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(ready_bits));
+                curr_running_thread_index = 31 - (uint32_t)clz_result;
+            }
+            else
+            {
+                curr_running_thread_index = MAX_THREADS; // Idle thread
+            }
         }
-        else
-        {
-            index = -1;
-        }
-
-        curr_running_thread_index = (index == -1) ? MAX_THREADS : (uint32_t)index;
 
         goto enable_and_return;
     }
@@ -295,32 +297,28 @@ __attribute__((naked)) void neo_thread_scheduler(void)
         ready_threads_bit_mask |= 1U << last_running_thread_index;
     }
 
-    /* Find next thread to run */
-    uint32_t ready_bits = ready_threads_bit_mask & ~(1U << MAX_THREADS);
-    int8_t index = -1;
+    /* Simple round-robin: try next thread index */
+    uint32_t next_index = (last_running_thread_index + 1) % MAX_THREADS;
+    uint32_t start_index = next_index;
 
-    if (!ready_bits)
+    /* Search for next ready thread in round-robin fashion */
+    while (!(ready_threads_bit_mask & (1U << next_index)))
     {
-        /* Find next thread after the last running thread */
-        uint32_t next_threads = ready_bits & ~((1U << last_running_thread_index) - 1);
-        if (!next_threads)
+        next_index++;
+        if (next_index == MAX_THREADS)
         {
-            /* Found a thread with higher index */
-            uint32_t clz_result;
-            __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(next_threads));
-            index = 31 - (int8_t)clz_result;
+            next_index = 0;
         }
-        else
+
+        /* If we've checked all threads, use idle thread */
+        if (next_index == start_index)
         {
-            /* Wrap around to lowest index */
-            uint32_t clz_result;
-            __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(ready_bits));
-            index = 31 - (int8_t)clz_result;
+            next_index = MAX_THREADS;
+            break;
         }
     }
 
-    /* If no ready threads found, run idle thread */
-    curr_running_thread_index = (index == -1) ? MAX_THREADS : (uint32_t)index;
+    curr_running_thread_index = next_index;
 
 enable_and_return:
     /* Update thread state and timing information */
