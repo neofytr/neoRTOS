@@ -43,6 +43,17 @@ volatile neo_thread_t *volatile thread_queue[MAX_THREADS + 1]; // this creates a
 // if the volatile keyword is placed before the *, then the data the ptr points to is volatile and not the pointer itself; otherwise, if the volatile keyword is placed after the *, then the pointer is volatile and not the data it points to
 volatile uint32_t thread_queue_len = 0;
 
+/*
+
+upon entering a function, the LR register contains the return address;
+this LR is saved on the stack upon function entry in the prologue (which is not present if attribute is naked, no we need to save and restore it manually before and after a function call from a
+naked function so that the naked function cannot clobber it's LR)
+this LR is then popped from the stack upon function exit in the epilogue (which is not present if attribute is naked)
+
+this saving and restoring of LR is done so that the LR is not clobbered if the function calls another function
+
+*/
+
 #define IDLE_THREAD_STACK_SIZE_IN_32_BITS 20
 volatile uint32_t idle_thread_stack[IDLE_THREAD_STACK_SIZE_IN_32_BITS];
 volatile neo_thread_t idle_thread;
