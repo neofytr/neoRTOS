@@ -386,6 +386,42 @@ void neo_start_threads(void)
     __enable_irq();
 }
 
+/**
+ * @brief Resume a paused thread
+ * Doesn't actually resume the thread as in the thread starts executing again; it just changes its state to READY
+ * The thread will come back to life when it's scheduled again
+ * @param thread Pointer to thread structure
+ * @return true if thread was paused and resumed, false otherwise
+ */
+__attribute__((naked)) bool neo_thread_resume(neo_thread_t *thread)
+{
+    __asm__ volatile("cpsid i \n");
+    if (thread->thread_state == PAUSED)
+    {
+        thread->thread_state = READY;
+        __asm__ volatile("cpsie i \n"
+                         "mov r0, #1 \n" // return true if thread was paused and we resumed it
+                         "bx lr \n");
+    }
+    __asm__ volatile("cpsie i \n"
+                     "mov r0, #0 \n" // return false otherwise since the thread was not paused to begin with
+                     "bx lr \n");
+}
+
+/**
+ * @brief Pause the current thread
+ * Pauses the current thread and triggers a context switch
+ * The thread is paused until it's manually resumed
+ */
+__attribute__((naked)) void neo_thread_pause(void)
+{
+    __asm__ volatile("cpsid i \n");
+    thread_queue[curr_running_thread_index]->thread_state = PAUSED;
+    SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
+    __asm__ volatile("cpsie i \n"
+                     "bx lr \n");
+}
+
 __attribute__((naked)) void update_sleeping_threads()
 {
     // this function is called with interrupts disabled
@@ -406,7 +442,7 @@ __attribute__((naked)) void update_sleeping_threads()
 
         // Check thread state (thread_state is at offset 8)
         "ldrb r12, [r3, #8]\n\t" // Load thread state as byte
-        "cmp r12, #2\n\t"        // Compare with BLOCKED (2)
+        "cmp r12, #2\n\t"        // Compare with SLEEPING (2)
         "bne next_iter\n\t"
 
         // Update sleep time (sleep_time is at offset 4)
@@ -442,8 +478,8 @@ __attribute__((naked)) void neo_thread_sleep(uint32_t time)
 {
     // time is in multiple of 100ms
     __asm__ volatile("cpsid i \n");
-    // set the thread state to blocked; everytime systick interrupt occurs, all threads that are blocked have their sleep_time decremented by 1
-    thread_queue[curr_running_thread_index]->thread_state = BLOCKED;
+    // set the thread state to SLEEPING; everytime systick interrupt occurs, all threads that are SLEEPING have their sleep_time decremented by 1
+    thread_queue[curr_running_thread_index]->thread_state = SLEEPING;
     // set the sleep time of the thread
     thread_queue[curr_running_thread_index]->sleep_time = time;
     // trigger context switch
