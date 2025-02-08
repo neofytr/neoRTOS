@@ -47,6 +47,21 @@ volatile uint32_t thread_queue_len = 0;
 volatile uint32_t idle_thread_stack[IDLE_THREAD_STACK_SIZE_IN_32_BITS];
 volatile neo_thread_t idle_thread;
 
+volatile uint32_t ready_threads_bit_mask = 0;
+volatile uint32_t new_threads_bit_mask = 0;
+volatile uint32_t sleeping_threads_bit_mask = 0;
+volatile uint32_t running_threads_bit_mask = 0;
+volatile uint32_t paused_threads_bit_mask = 0;
+
+volatile uint32_t thread_sleep_time[MAX_THREADS];
+
+// returns the bit number of the most significant one in num
+// if there is no one in num (i.e num is zero), it returns -1
+static inline int8_t most_sig_one(uint32_t num)
+{
+    return 31 - (int8_t)__CLZ(num);
+}
+
 void idle_thread_function(void)
 {
     while (true)
@@ -72,8 +87,9 @@ void neo_kernel_init(void)
     NVIC_SetPriority(SysTick_IRQn, 0x00); // setting priority to 0x00
 
     thread_queue[MAX_THREADS] = &idle_thread;
+    idle_thread.thread_id = MAX_THREADS;
 
-    idle_thread.thread_state = READY;
+    ready_threads_bit_mask |= 1U << idle_thread.thread_id;
     idle_thread.stack_ptr = (uint8_t *)(((uintptr_t)idle_thread_stack + IDLE_THREAD_STACK_SIZE_IN_32_BITS * 4) & ~(STACK_ALIGNMENT - 1));
 
     uint32_t *ptr = (uint32_t *)idle_thread.stack_ptr;
@@ -247,12 +263,6 @@ __attribute__((naked)) void neo_context_switch(void)
  */
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
-    /* Fast path: handle empty queue case */
-    if (!thread_queue_len)
-    {
-        goto enable_and_return;
-    }
-
     /* Handle first-time scheduling initialization */
     if (is_first_time)
     {
@@ -348,6 +358,7 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
     }
 
     // Add thread to queue
+    thread->thread_id = thread_queue_len;
     thread_queue[thread_queue_len++] = thread;
 
     // Align stack pointer to 8-byte boundary (AAPCS requirement)
@@ -383,7 +394,7 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
     }
 
     thread->stack_ptr = (uint8_t *)ptr;
-    thread->thread_state = NEW;
+    new_threads_bit_mask |= 1U << thread->thread_id;
     __enable_irq(); // enable interrupts only after the thread has been initialized
     return true;
 }
@@ -399,9 +410,9 @@ __attribute__((naked)) bool neo_thread_start(neo_thread_t *thread)
 {
     __asm__ volatile("cpsid i \n");
     has_threads_started = 1;
-    if (thread->thread_state == NEW)
+    if (new_threads_bit_mask & (1U << thread->thread_id))
     {
-        thread->thread_state = READY;
+        ready_threads_bit_mask |= 1U << thread->thread_id;
         __asm__ volatile("cpsie i \n"
                          "mov r0, #1 \n" // return true if thread was new and we started it
                          "bx lr \n");
@@ -419,12 +430,11 @@ __attribute__((naked)) bool neo_thread_start(neo_thread_t *thread)
 void neo_thread_start_all_new(void)
 {
     __disable_irq();
-    for (uint32_t index = 0; index < thread_queue_len; index++)
+    int8_t index;
+    while ((index = most_sig_one(new_threads_bit_mask)) != -1) // efficient way to find the ready threads
     {
-        if (thread_queue[index]->thread_state == NEW)
-        {
-            thread_queue[index]->thread_state = READY;
-        }
+        ready_threads_bit_mask |= 1U << index;  // add the thread to the ready threads
+        new_threads_bit_mask &= ~(1U << index); // remove the thread from the new threads
     }
     has_threads_started = 1;
     __enable_irq();
@@ -440,9 +450,9 @@ void neo_thread_start_all_new(void)
 __attribute__((naked)) bool neo_thread_resume(neo_thread_t *thread)
 {
     __asm__ volatile("cpsid i \n");
-    if (thread->thread_state == PAUSED)
+    if (paused_threads_bit_mask & (1U << thread->thread_id))
     {
-        thread->thread_state = READY;
+        ready_threads_bit_mask |= 1U << thread->thread_id;
         __asm__ volatile("cpsie i \n"
                          "mov r0, #1 \n" // return true if thread was paused and we resumed it
                          "bx lr \n");
@@ -460,13 +470,31 @@ __attribute__((naked)) bool neo_thread_resume(neo_thread_t *thread)
 __attribute__((naked)) void neo_thread_pause(void)
 {
     __asm__ volatile("cpsid i \n");
-    thread_queue[curr_running_thread_index]->thread_state = PAUSED;
+    paused_threads_bit_mask |= 1U << curr_running_thread_index;
     SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
     __asm__ volatile("cpsie i \n"
                      "bx lr \n");
 }
 
 __attribute__((naked)) void update_sleeping_threads()
+{
+    // this function is called with interrupts disabled
+    int8_t index;
+
+    while ((index = most_sig_one(sleeping_threads_bit_mask)) != -1)
+    {
+        thread_sleep_time[index]--;
+        if (!thread_sleep_time[index])
+        {
+            ready_threads_bit_mask |= 1U << index;
+            sleeping_threads_bit_mask &= ~(1U << index);
+        }
+    }
+
+    __asm__ volatile("b return_from_update \n");
+}
+
+/* __attribute__((naked)) void update_sleeping_threads()
 {
     // this function is called with interrupts disabled
     __asm__ volatile(
@@ -515,7 +543,7 @@ __attribute__((naked)) void update_sleeping_threads()
         :                                         // Input operands
         : "r0", "r1", "r2", "r3", "r12", "memory" // Clobber list
     );
-}
+} */
 
 /* A subtle problem is that the thread calling sleep gets context switched just before the call; this can lead to the thread waiting more than expected; fundamental flaw */
 __attribute__((naked)) void neo_thread_sleep(uint32_t time)
@@ -523,9 +551,9 @@ __attribute__((naked)) void neo_thread_sleep(uint32_t time)
     // time is in multiple of 100ms
     __asm__ volatile("cpsid i \n");
     // set the thread state to SLEEPING; everytime systick interrupt occurs, all threads that are SLEEPING have their sleep_time decremented by 1
-    thread_queue[curr_running_thread_index]->thread_state = SLEEPING;
+    sleeping_threads_bit_mask |= 1U << curr_running_thread_index;
     // set the sleep time of the thread
-    thread_queue[curr_running_thread_index]->sleep_time = time;
+    thread_sleep_time[curr_running_thread_index] = time;
     // trigger context switch
     SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
     __asm__ volatile("cpsie i \n"
