@@ -299,11 +299,11 @@ __attribute__((naked)) void neo_thread_scheduler(void)
     uint32_t ready_bits = ready_threads_bit_mask & ~(1U << MAX_THREADS);
     int8_t index = -1;
 
-    if (ready_bits != 0)
+    if (!ready_bits)
     {
         /* Find next thread after the last running thread */
         uint32_t next_threads = ready_bits & ~((1U << last_running_thread_index) - 1);
-        if (next_threads != 0)
+        if (!next_threads)
         {
             /* Found a thread with higher index */
             uint32_t clz_result;
@@ -483,53 +483,49 @@ __attribute__((naked)) void neo_thread_pause(void)
 __attribute__((naked)) void update_sleeping_threads()
 {
     __asm__ volatile(
-        // Load address of sleeping_threads_bit_mask
+        // Load addresses of key variables
+        "push {r4, r5, r6} \n" // Save registers we'll use
         "ldr r0, =sleeping_threads_bit_mask \n"
-        "ldr r1, =thread_sleep_time \n" // Array base address
+        "ldr r1, =thread_sleep_time \n"
         "ldr r2, =ready_threads_bit_mask \n"
+        "mov r6, #0 \n" // Initialize loop counter
 
-        "main_loop: \n"
-        // Load sleeping_threads_bit_mask value (volatile)
-        "ldr r3, [r0] \n"
-
-        // Check if mask is 0
-        "cmp r3, #0 \n"
+        "check_thread: \n"
+        "cmp r6, #10 \n" // Check if we've processed all possible threads
         "beq done \n"
 
-        // Calculate index = 31 - clz
-        "clz r12, r3 \n"
-        "rsb r12, r12, #31 \n"
+        // Check if this thread is sleeping
+        "ldr r3, [r0] \n" // Load sleeping mask
+        "mov r4, #1 \n"
+        "lsl r4, r4, r6 \n" // Create bit mask for current thread
+        "tst r3, r4 \n"     // Test if thread is sleeping
+        "beq next_thread \n"
 
-        // Load and decrement sleep time
-        // Multiply index by 4 since array elements are uint32_t
-        "lsl r3, r12, #2 \n"   // r3 = index * 4
-        "ldr r3, [r1, r3] \n"  // Load uint32_t value
-        "sub r3, r3, #1 \n"    // Decrement
-        "lsl r12, r12, #2 \n"  // r12 = index * 4 (preserve index for later)
-        "str r3, [r1, r12] \n" // Store back uint32_t value
+        // Decrement sleep time
+        "lsl r5, r6, #2 \n"   // r5 = thread_index * 4
+        "ldr r3, [r1, r5] \n" // Load sleep time
+        "sub r3, r3, #1 \n"   // Decrement
+        "str r3, [r1, r5] \n" // Store updated time
 
-        // Check if sleep time reached 0
+        // Check if sleep completed
         "cmp r3, #0 \n"
-        "bne main_loop \n"
+        "bne next_thread \n"
 
-        // Sleep time is 0, update masks
-        "lsr r12, r12, #2 \n" // Convert back to bit index
-        "mov r3, #1 \n"
-        "lsl r3, r3, r12 \n" // Create bit mask (1 << index)
+        // Wake up thread
+        "ldr r3, [r0] \n"   // Load sleeping mask
+        "bic r3, r3, r4 \n" // Clear sleeping bit
+        "str r3, [r0] \n"   // Update sleeping mask
 
-        // Update ready_threads_bit_mask (volatile)
-        "ldr r12, [r2] \n"
-        "orr r12, r12, r3 \n"
-        "str r12, [r2] \n"
+        "ldr r3, [r2] \n"   // Load ready mask
+        "orr r3, r3, r4 \n" // Set ready bit
+        "str r3, [r2] \n"   // Update ready mask
 
-        // Update sleeping_threads_bit_mask (volatile)
-        "ldr r12, [r0] \n"
-        "bic r12, r12, r3 \n"
-        "str r12, [r0] \n"
-
-        "b main_loop \n"
+        "next_thread: \n"
+        "add r6, r6, #1 \n" // Increment thread counter
+        "b check_thread \n"
 
         "done: \n"
+        "pop {r4, r5, r6} \n" // Restore registers
         "b return_from_update \n");
 }
 
