@@ -41,130 +41,130 @@ LOAD binaries/system_core.o
                 0x08000000                vectors
                 0x08000150                        . = ALIGN (0x4)
 
-.text           0x08000150      0x578
+.text           0x08000150      0x574
                 0x08000150                        . = ALIGN (0x4)
  *(.text)
  .text          0x08000150       0xa0 binaries/main.o
                 0x08000150                thread_two_fxn
                 0x080001a0                thread_one_fxn
- .text          0x080001f0      0x360 binaries/neo_threads.o
+ .text          0x080001f0      0x35c binaries/neo_threads.o
                 0x080001f0                idle_thread_function
                 0x080001f4                neo_kernel_init
                 0x0800026c                thread_handler
                 0x080002a0                PendSV_handler
                 0x080002be                neo_context_switch
                 0x080002f2                neo_thread_scheduler
-                0x080003a8                neo_thread_init
-                0x0800041c                neo_thread_start
-                0x08000444                neo_thread_start_all_new
-                0x0800047c                neo_thread_resume
-                0x08000498                neo_thread_pause
-                0x080004c0                update_sleeping_threads
-                0x08000500                neo_thread_sleep
- .text          0x08000550       0x88 binaries/startup.o
-                0x08000550                EXTI15_10_handler
-                0x08000550                DMA1_Stream7_handler
-                0x08000550                USART1_handler
-                0x08000550                TIM1_UP_TIM10_handler
-                0x08000550                EXTI0_handler
-                0x08000550                DMA1_Stream1_handler
-                0x08000550                SDIO_handler
-                0x08000550                NMI_handler
-                0x08000550                DMA2_Stream3_handler
-                0x08000550                TIM2_handler
-                0x08000550                USART2_handler
-                0x08000550                PVD_EXTI16_handler
-                0x08000550                SPI3_handler
-                0x08000550                TIM3_handler
-                0x08000550                WWDG_handler
-                0x08000550                default_handler
-                0x08000550                SPI2_handler
-                0x08000550                SVCall_handler
-                0x08000550                DMA2_Stream6_handler
-                0x08000550                DebugMonitor_handler
-                0x08000550                I2C3_ER_handler
-                0x08000550                DMA1_Stream3_handler
-                0x08000550                MemManage_handler
-                0x08000550                EXTI9_5_handler
-                0x08000550                SPI4_handler
-                0x08000550                HardFault_handler
-                0x08000550                DMA1_Stream5_handler
-                0x08000550                FPU_handler
-                0x08000550                DMA2_Stream5_handler
-                0x08000550                RCC_handler
-                0x08000550                EXTI2_handler
-                0x08000550                DMA2_Stream1_handler
-                0x08000550                I2C1_ER_handler
-                0x08000550                I2C2_EV_handler
-                0x08000550                RTC_WKUP_EXTI22_handler
-                0x08000550                EXTI3_handler
-                0x08000550                DMA2_Stream0_handler
-                0x08000550                FLASH_handler
-                0x08000550                TAMP_STAMP_EXTI21_handler
-                0x08000550                OTG_FS_handler
-                0x08000550                DMA1_Stream4_handler
-                0x08000550                I2C2_ER_handler
-                0x08000550                TIM1_BRK_TIM9_handler
-                0x08000550                USART6_handler
-                0x08000550                TIM4_handler
-                0x08000550                DMA1_Stream2_handler
-                0x08000550                EXTI4_handler
-                0x08000550                DMA1_Stream6_handler
-                0x08000550                ADC_handler
-                0x08000550                I2C1_EV_handler
-                0x08000550                SPI1_handler
-                0x08000550                OTG_FS_WKUP_EXTI18_handler
-                0x08000550                DMA2_Stream4_handler
-                0x08000550                DMA2_Stream7_handler
-                0x08000550                UsageFault_handler
-                0x08000550                DMA1_Stream0_handler
-                0x08000550                DMA2_Stream2_handler
-                0x08000550                EXTI1_handler
-                0x08000550                TIM1_TRG_COM_TIM11_handler
-                0x08000550                TIM5_handler
-                0x08000550                RTC_Alarm_EXTI17_handler
-                0x08000550                I2C3_EV_handler
-                0x08000550                BusFault_handler
-                0x08000550                TIM1_CC_handler
-                0x08000554                reset_handler
-                0x080005a0                enable_fpu
-                0x080005b4                system_reset
- .text          0x080005d8       0xa0 binaries/system_core.o
-                0x080005d8                SysTick_handler
-                0x080005e8                exit_from_interrupt_
-                0x080005ec                get_tick_count
-                0x080005fc                LED_setup
-                0x08000624                has_time_passed
-                0x08000638                setup_systick
-                0x08000670                default_thread_handler
+                0x080003a4                neo_thread_init
+                0x08000418                neo_thread_start
+                0x08000440                neo_thread_start_all_new
+                0x08000478                neo_thread_resume
+                0x08000494                neo_thread_pause
+                0x080004bc                update_sleeping_threads
+                0x080004fc                neo_thread_sleep
+ .text          0x0800054c       0x88 binaries/startup.o
+                0x0800054c                EXTI15_10_handler
+                0x0800054c                DMA1_Stream7_handler
+                0x0800054c                USART1_handler
+                0x0800054c                TIM1_UP_TIM10_handler
+                0x0800054c                EXTI0_handler
+                0x0800054c                DMA1_Stream1_handler
+                0x0800054c                SDIO_handler
+                0x0800054c                NMI_handler
+                0x0800054c                DMA2_Stream3_handler
+                0x0800054c                TIM2_handler
+                0x0800054c                USART2_handler
+                0x0800054c                PVD_EXTI16_handler
+                0x0800054c                SPI3_handler
+                0x0800054c                TIM3_handler
+                0x0800054c                WWDG_handler
+                0x0800054c                default_handler
+                0x0800054c                SPI2_handler
+                0x0800054c                SVCall_handler
+                0x0800054c                DMA2_Stream6_handler
+                0x0800054c                DebugMonitor_handler
+                0x0800054c                I2C3_ER_handler
+                0x0800054c                DMA1_Stream3_handler
+                0x0800054c                MemManage_handler
+                0x0800054c                EXTI9_5_handler
+                0x0800054c                SPI4_handler
+                0x0800054c                HardFault_handler
+                0x0800054c                DMA1_Stream5_handler
+                0x0800054c                FPU_handler
+                0x0800054c                DMA2_Stream5_handler
+                0x0800054c                RCC_handler
+                0x0800054c                EXTI2_handler
+                0x0800054c                DMA2_Stream1_handler
+                0x0800054c                I2C1_ER_handler
+                0x0800054c                I2C2_EV_handler
+                0x0800054c                RTC_WKUP_EXTI22_handler
+                0x0800054c                EXTI3_handler
+                0x0800054c                DMA2_Stream0_handler
+                0x0800054c                FLASH_handler
+                0x0800054c                TAMP_STAMP_EXTI21_handler
+                0x0800054c                OTG_FS_handler
+                0x0800054c                DMA1_Stream4_handler
+                0x0800054c                I2C2_ER_handler
+                0x0800054c                TIM1_BRK_TIM9_handler
+                0x0800054c                USART6_handler
+                0x0800054c                TIM4_handler
+                0x0800054c                DMA1_Stream2_handler
+                0x0800054c                EXTI4_handler
+                0x0800054c                DMA1_Stream6_handler
+                0x0800054c                ADC_handler
+                0x0800054c                I2C1_EV_handler
+                0x0800054c                SPI1_handler
+                0x0800054c                OTG_FS_WKUP_EXTI18_handler
+                0x0800054c                DMA2_Stream4_handler
+                0x0800054c                DMA2_Stream7_handler
+                0x0800054c                UsageFault_handler
+                0x0800054c                DMA1_Stream0_handler
+                0x0800054c                DMA2_Stream2_handler
+                0x0800054c                EXTI1_handler
+                0x0800054c                TIM1_TRG_COM_TIM11_handler
+                0x0800054c                TIM5_handler
+                0x0800054c                RTC_Alarm_EXTI17_handler
+                0x0800054c                I2C3_EV_handler
+                0x0800054c                BusFault_handler
+                0x0800054c                TIM1_CC_handler
+                0x08000550                reset_handler
+                0x0800059c                enable_fpu
+                0x080005b0                system_reset
+ .text          0x080005d4       0xa0 binaries/system_core.o
+                0x080005d4                SysTick_handler
+                0x080005e4                exit_from_interrupt_
+                0x080005e8                get_tick_count
+                0x080005f8                LED_setup
+                0x08000620                has_time_passed
+                0x08000634                setup_systick
+                0x0800066c                default_thread_handler
  *(.text*)
- .text.startup  0x08000678       0x50 binaries/main.o
-                0x08000678                main
+ .text.startup  0x08000674       0x50 binaries/main.o
+                0x08000674                main
  *(.rodata)
  *(.rodata*)
-                0x080006c8                        . = ALIGN (0x4)
-                0x080006c8                        _etext = .
-                0x080006c8                        _sidata = LOADADDR (.data)
+                0x080006c4                        . = ALIGN (0x4)
+                0x080006c4                        _etext = .
+                0x080006c4                        _sidata = LOADADDR (.data)
 
-.glue_7         0x080006c8        0x0
- .glue_7        0x080006c8        0x0 linker stubs
+.glue_7         0x080006c4        0x0
+ .glue_7        0x080006c4        0x0 linker stubs
 
-.glue_7t        0x080006c8        0x0
- .glue_7t       0x080006c8        0x0 linker stubs
+.glue_7t        0x080006c4        0x0
+ .glue_7t       0x080006c4        0x0 linker stubs
 
-.vfp11_veneer   0x080006c8        0x0
- .vfp11_veneer  0x080006c8        0x0 linker stubs
+.vfp11_veneer   0x080006c4        0x0
+ .vfp11_veneer  0x080006c4        0x0 linker stubs
 
-.v4_bx          0x080006c8        0x0
- .v4_bx         0x080006c8        0x0 linker stubs
+.v4_bx          0x080006c4        0x0
+ .v4_bx         0x080006c4        0x0 linker stubs
 
-.iplt           0x080006c8        0x0
- .iplt          0x080006c8        0x0 binaries/main.o
+.iplt           0x080006c4        0x0
+ .iplt          0x080006c4        0x0 binaries/main.o
 
-.rel.dyn        0x080006c8        0x0
- .rel.iplt      0x080006c8        0x0 binaries/main.o
+.rel.dyn        0x080006c4        0x0
+ .rel.iplt      0x080006c4        0x0 binaries/main.o
 
-.data           0x20000000        0x4 load address 0x080006c8
+.data           0x20000000        0x4 load address 0x080006c4
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _sdata = .
  *(.data)
@@ -174,10 +174,10 @@ LOAD binaries/system_core.o
                 0x20000004                        . = ALIGN (0x4)
                 0x20000004                        _edata = .
 
-.igot.plt       0x20000004        0x0 load address 0x080006cc
+.igot.plt       0x20000004        0x0 load address 0x080006c8
  .igot.plt      0x20000004        0x0 binaries/main.o
 
-.bss            0x20000004      0x1f8 load address 0x080006cc
+.bss            0x20000004      0x1f8 load address 0x080006c8
                 0x20000004                        . = ALIGN (0x4)
                 0x20000004                        __bss_start__ = .
  *(.bss)
@@ -203,7 +203,7 @@ LOAD binaries/system_core.o
                 0x200001fc                        . = ALIGN (0x4)
                 0x200001fc                        __bss_end__ = .
 
-.heap           0x200001fc      0x404 load address 0x080006cc
+.heap           0x200001fc      0x404 load address 0x080006c8
                 0x20000200                        . = ALIGN (0x8)
  *fill*         0x200001fc        0x4 
                 0x20000200                        _heap_start = .
@@ -213,7 +213,7 @@ LOAD binaries/system_core.o
                 0x20000600                        _heap_end = .
                 0x20000600                        _end = .
 
-.stack          0x20000600      0x200 load address 0x080006cc
+.stack          0x20000600      0x200 load address 0x080006c8
                 0x20000600                        . = ALIGN (0x8)
                 0x20000600                        _stack_start = .
                 0x20000800                        . = (. + __max_stack_size)

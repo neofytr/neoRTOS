@@ -13,7 +13,7 @@ typedef enum
     RUNNING = 1,
     SLEEPING = 2,
     PAUSED = 3,
-    NEW = 5,
+    NEW = 4,
 } neo_thread_state_t;
 
 /* if the structure is ever changed, please update the requisite hardcoded values in the udpate sleeping threads function */

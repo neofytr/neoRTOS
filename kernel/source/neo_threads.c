@@ -164,7 +164,7 @@ __attribute__((naked)) void PendSV_handler(void)
         "beq skip_save\n"
 
         // Save registers R4-R11 (callee-saved registers)
-        "push {r4-r11}\n"
+        "stmdb sp!, {r4-r11}\n"
 
         /* we have now saved the registers r4 to r11; we can clobber them in the subsequent function calls */
 
@@ -177,7 +177,7 @@ __attribute__((naked)) void PendSV_handler(void)
 
         "switch:\n"
         // Restore callee-saved registers
-        "pop {r4-r11}\n"
+        "ldmia sp!, {r4-r11}\n"
         "cpsie i\n" // enable interrupts again
         "bx lr\n");
 }
@@ -272,8 +272,7 @@ __attribute__((naked)) void neo_thread_scheduler(void)
     last_running_thread_index = curr_running_thread_index;
 
     /* Update previous thread state if it was running */
-    if (last_running_thread_index != MAX_THREADS &&
-        thread_queue[last_running_thread_index]->thread_state == RUNNING)
+    if (thread_queue[last_running_thread_index]->thread_state == RUNNING)
     {
         thread_queue[last_running_thread_index]->thread_state = READY;
     }
@@ -290,7 +289,11 @@ __attribute__((naked)) void neo_thread_scheduler(void)
             curr_running_thread_index = current;
             goto enable_and_return;
         }
-        current = (current + 1) % thread_queue_len;
+        current++;
+        if (current >= thread_queue_len)
+        {
+            current = 0;
+        }
     } while (current != start);
 
     /* No ready threads found, switch to idle thread */
