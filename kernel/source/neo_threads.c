@@ -51,7 +51,8 @@ void idle_thread_function(void)
 {
     while (true)
     {
-        __asm__ volatile("nop");
+        /* The CPU goes into sleep mode and wakes up when an interrupt occurs */
+        __asm__ volatile("wfi");
     }
 }
 
@@ -278,7 +279,19 @@ __attribute__((naked)) void neo_thread_scheduler(void)
     }
 
     /* Initialize search starting point */
-    uint32_t start = (last_running_thread_index == MAX_THREADS) ? 0 : (last_running_thread_index + 1) % thread_queue_len;
+    uint32_t start;
+    if (last_running_thread_index == MAX_THREADS)
+    {
+        start = 0;
+    }
+    else
+    {
+        start = last_running_thread_index + 1;
+        if (start >= thread_queue_len)
+        {
+            start = 0;
+        }
+    }
     uint32_t current = start;
 
     /* Search for next ready thread */
