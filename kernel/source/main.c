@@ -42,7 +42,7 @@ void thread_two_fxn(void *arg)
         if (block_once)
         {
             block_once = false;
-            neo_thread_sleep(30); // blocks for 2 seconds
+            neo_thread_pause();
         }
     }
 }
@@ -53,7 +53,6 @@ void thread_one_fxn(void *arg)
     (int *)arg++;
     uint32_t start = get_tick_count();
     bool is_on = false;
-    bool block_once = true;
     while (true)
     {
         if (has_time_passed(5, start))
@@ -69,12 +68,6 @@ void thread_one_fxn(void *arg)
                 SET_BIT(GPIOA->BSRR, PIN5);
                 is_on = true;
             }
-        }
-
-        if (block_once)
-        {
-            block_once = false;
-            neo_thread_sleep(30); // blocks for 2 seconds
         }
     }
 }
