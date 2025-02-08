@@ -125,6 +125,8 @@ __attribute__((naked)) void thread_handler(void)
     // interrupts are already disabled when this function enters
     // we will not save the registers r4 to r11 of the current thread in this function; we will save them in the PendSV handler; so we can't clobber them in this function
     // we can save them in this function though; but we will not do that
+    /* we can do regular function calls from this using bl instead of just branching there with b by first saving lr on stack then popping it after the return; we aren't doing that though */
+    /* so any of the branches shouldn't use bl to call functions or lr will get clobbered */
     __asm__ volatile(
         ".extern exit_from_interrupt_\n"
 
@@ -173,6 +175,12 @@ __attribute__((naked)) void PendSV_handler(void)
 {
     /* Arm exception execution has tail-chaining in which if one interrupt handler is executed just after another interrupt, the stack pop in the previous handler and stack push in the next handler is skipped */
     /* This is because the push contents of both the handlers will be the same as no new application code has executed between them; this reduces exception call o */
+
+    /* IMPORTANT */
+    /* we can't use normal function call (bl instruction) for context switch */
+    /* we would push lr before the bl call and then pop lr after the call; but that won't work as context switch switches the value of sp to different stacks!!! */
+    /* we need to save lr before calling context switch (or any other function) since we can't afford to clobber lr as it contains the original EXC_RETURN and we haven't saved lr at the start of the
+    function which would also be incorrect since we switch stacks in this function and popping lr at the last would be incorrect */
     __asm__ volatile(
         // Check if context save is needed
         "cpsid i\n"
@@ -208,6 +216,8 @@ __attribute__((naked)) void neo_context_switch(void)
 {
     /* we have now saved the registers r4 to r11; we can clobber them */
     /* interrupts are disabled before entering this function */
+
+    /* should have no bl instruction for calls */
 
     __asm__ volatile(
         // Check first time switch (using r3 since we don't need thread_queue_len anymore)
@@ -263,6 +273,8 @@ __attribute__((naked)) void neo_thread_scheduler(void)
 {
     // this function is called with interrupts disabled
     /* Handle first-time scheduling initialization */
+
+    /* should have no bl instruction for calls */
     if (is_first_time)
     {
         /* Start with the first thread (index 0) */
