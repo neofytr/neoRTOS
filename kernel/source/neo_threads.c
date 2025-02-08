@@ -90,9 +90,10 @@ void neo_kernel_init(void)
     idle_thread.thread_id = MAX_THREADS;
 
     ready_threads_bit_mask |= 1U << idle_thread.thread_id;
-    idle_thread.stack_ptr = (uint8_t *)(((uintptr_t)idle_thread_stack + IDLE_THREAD_STACK_SIZE_IN_32_BITS * 4) & ~(STACK_ALIGNMENT - 1));
+    uint8_t *aligned_top = (uint8_t *)(((uintptr_t)idle_thread_stack + IDLE_THREAD_STACK_SIZE_IN_32_BITS * 4) & ~(STACK_ALIGNMENT - 1));
 
-    uint32_t *ptr = (uint32_t *)idle_thread.stack_ptr;
+    // Use temporary pointer to build stack frame
+    uint32_t *ptr = (uint32_t *)aligned_top;
 
     *(--ptr) = 0x01000000;                     // xPSR (Thumb bit)
     *(--ptr) = (uint32_t)idle_thread_function; // PC
@@ -104,13 +105,13 @@ void neo_kernel_init(void)
     *(--ptr) = 0;                              // R0
 
     // Initialize callee-saved registers
-    for (volatile int i = 0; i < 8; i++) // without volatile, memset is used which I have not defined
+    for (volatile int i = 0; i < 8; i++)
     {
         *(--ptr) = 0; // R11-R4
     }
 
+    // Only now set the thread's stack pointer to the final position
     idle_thread.stack_ptr = (uint8_t *)ptr;
-#undef IDLE_THREAD_STACK_SIZE_IN_32_BITS
     __enable_irq();
 }
 
@@ -207,12 +208,8 @@ __attribute__((naked)) void neo_context_switch(void)
 {
     /* we have now saved the registers r4 to r11; we can clobber them */
     /* interrupts are disabled before entering this function */
-    __asm__ volatile(
-        // Load thread_queue_len directly into r3 to check if there are threads
-        "ldr r3, =thread_queue_len\n"
-        "ldr r3, [r3]\n"
-        "cbz r3, 2f\n" // branch if r3 is zero
 
+    __asm__ volatile(
         // Check first time switch (using r3 since we don't need thread_queue_len anymore)
         "ldr r3, =is_first_time\n"
         "ldr r3, [r3]\n"
@@ -261,21 +258,30 @@ __attribute__((naked)) void neo_context_switch(void)
  * @note Registers r4-r11 are already saved before entering this function
  * @note Interrupts are disabled when entering this function
  */
+
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
+    // this function is called with interrupts disabled
     /* Handle first-time scheduling initialization */
     if (is_first_time)
     {
         /* Find first ready thread or default to idle */
-        for (uint32_t i = 0; i < thread_queue_len; i++)
+        uint32_t ready_bits = ready_threads_bit_mask & ~(1U << MAX_THREADS);
+        int8_t index;
+
+        if (ready_bits)
         {
-            if (thread_queue[i]->thread_state == READY)
-            {
-                curr_running_thread_index = i;
-                goto enable_and_return;
-            }
+            uint32_t clz_result;
+            __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(ready_bits));
+            index = 31 - (int8_t)clz_result;
         }
-        curr_running_thread_index = MAX_THREADS; // No ready threads, run idle
+        else
+        {
+            index = -1;
+        }
+
+        curr_running_thread_index = (index == -1) ? MAX_THREADS : (uint32_t)index;
+
         goto enable_and_return;
     }
 
@@ -283,48 +289,43 @@ __attribute__((naked)) void neo_thread_scheduler(void)
     last_running_thread_index = curr_running_thread_index;
 
     /* Update previous thread state if it was running */
-    if (thread_queue[last_running_thread_index]->thread_state == RUNNING)
+    if (running_threads_bit_mask & (1U << last_running_thread_index))
     {
-        thread_queue[last_running_thread_index]->thread_state = READY;
+        running_threads_bit_mask &= ~(1U << last_running_thread_index);
+        ready_threads_bit_mask |= 1U << last_running_thread_index;
     }
 
-    /* Initialize search starting point */
-    uint32_t start;
-    if (last_running_thread_index == MAX_THREADS)
-    {
-        start = 0;
-    }
-    else
-    {
-        start = last_running_thread_index + 1;
-        if (start >= thread_queue_len)
-        {
-            start = 0;
-        }
-    }
-    uint32_t current = start;
+    /* Find next thread to run */
+    uint32_t ready_bits = ready_threads_bit_mask & ~(1U << MAX_THREADS);
+    int8_t index = -1;
 
-    /* Search for next ready thread */
-    do
+    if (ready_bits != 0)
     {
-        if (thread_queue[current]->thread_state == READY)
+        /* Find next thread after the last running thread */
+        uint32_t next_threads = ready_bits & ~((1U << last_running_thread_index) - 1);
+        if (next_threads != 0)
         {
-            curr_running_thread_index = current;
-            goto enable_and_return;
+            /* Found a thread with higher index */
+            uint32_t clz_result;
+            __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(next_threads));
+            index = 31 - (int8_t)clz_result;
         }
-        current++;
-        if (current >= thread_queue_len)
+        else
         {
-            current = 0;
+            /* Wrap around to lowest index */
+            uint32_t clz_result;
+            __asm__ volatile("clz %0, %1" : "=r"(clz_result) : "r"(ready_bits));
+            index = 31 - (int8_t)clz_result;
         }
-    } while (current != start);
+    }
 
-    /* No ready threads found, switch to idle thread */
-    curr_running_thread_index = MAX_THREADS;
+    /* If no ready threads found, run idle thread */
+    curr_running_thread_index = (index == -1) ? MAX_THREADS : (uint32_t)index;
 
 enable_and_return:
     /* Update thread state and timing information */
-    thread_queue[curr_running_thread_index]->thread_state = RUNNING;
+    running_threads_bit_mask = 1U << curr_running_thread_index;
+    ready_threads_bit_mask &= ~(1U << curr_running_thread_index);
     last_thread_start_tick = tick_count;
 
     /* Return to assembly context switch code */
@@ -453,6 +454,7 @@ __attribute__((naked)) bool neo_thread_resume(neo_thread_t *thread)
     if (paused_threads_bit_mask & (1U << thread->thread_id))
     {
         ready_threads_bit_mask |= 1U << thread->thread_id;
+        paused_threads_bit_mask &= ~(1U << thread->thread_id);
         __asm__ volatile("cpsie i \n"
                          "mov r0, #1 \n" // return true if thread was paused and we resumed it
                          "bx lr \n");
@@ -471,6 +473,8 @@ __attribute__((naked)) void neo_thread_pause(void)
 {
     __asm__ volatile("cpsid i \n");
     paused_threads_bit_mask |= 1U << curr_running_thread_index;
+    ready_threads_bit_mask &= ~(1U << curr_running_thread_index);
+    running_threads_bit_mask &= ~(1U << curr_running_thread_index);
     SCB->ICSR |= (1U << (2 * PENDSV_IRQ_NUM));
     __asm__ volatile("cpsie i \n"
                      "bx lr \n");
@@ -478,72 +482,56 @@ __attribute__((naked)) void neo_thread_pause(void)
 
 __attribute__((naked)) void update_sleeping_threads()
 {
-    // this function is called with interrupts disabled
-    int8_t index;
-
-    while ((index = most_sig_one(sleeping_threads_bit_mask)) != -1)
-    {
-        thread_sleep_time[index]--;
-        if (!thread_sleep_time[index])
-        {
-            ready_threads_bit_mask |= 1U << index;
-            sleeping_threads_bit_mask &= ~(1U << index);
-        }
-    }
-
-    __asm__ volatile("b return_from_update \n");
-}
-
-/* __attribute__((naked)) void update_sleeping_threads()
-{
-    // this function is called with interrupts disabled
     __asm__ volatile(
-        // Initialize index (r0) to 0 and load thread_queue_len into r1
-        "mov r0, #0\n\t"
-        "ldr r1, =thread_queue_len\n\t"
-        "ldr r1, [r1]\n\t"
-        "ldr r2, =thread_queue\n\t"
+        // Load address of sleeping_threads_bit_mask
+        "ldr r0, =sleeping_threads_bit_mask \n"
+        "ldr r1, =thread_sleep_time \n" // Array base address
+        "ldr r2, =ready_threads_bit_mask \n"
 
-        // Main loop label
-        "sleeping_threads_loop:\n\t"
-        "cmp r0, r1\n\t"
-        "beq exit_loop\n\t"
+        "main_loop: \n"
+        // Load sleeping_threads_bit_mask value (volatile)
+        "ldr r3, [r0] \n"
 
-        // Load thread pointer
-        "ldr r3, [r2]\n\t" // r3 = thread_queue[index]
+        // Check if mask is 0
+        "cmp r3, #0 \n"
+        "beq done \n"
 
-        // Check thread state (thread_state is at offset 8)
-        "ldrb r12, [r3, #8]\n\t" // Load thread state as byte
-        "cmp r12, #2\n\t"        // Compare with SLEEPING (2)
-        "bne next_iter\n\t"
+        // Calculate index = 31 - clz
+        "clz r12, r3 \n"
+        "rsb r12, r12, #31 \n"
 
-        // Update sleep time (sleep_time is at offset 4)
-        "ldr r12, [r3, #4]\n\t" // Load sleep_time
-        "subs r12, #1\n\t"      // Decrement sleep time
-        "str r12, [r3, #4]\n\t" // Store updated sleep time
+        // Load and decrement sleep time
+        // Multiply index by 4 since array elements are uint32_t
+        "lsl r3, r12, #2 \n"   // r3 = index * 4
+        "ldr r3, [r1, r3] \n"  // Load uint32_t value
+        "sub r3, r3, #1 \n"    // Decrement
+        "lsl r12, r12, #2 \n"  // r12 = index * 4 (preserve index for later)
+        "str r3, [r1, r12] \n" // Store back uint32_t value
 
-        // Check if sleep time is 0
-        "cmp r12, #0\n\t"
-        "bne next_iter\n\t"
+        // Check if sleep time reached 0
+        "cmp r3, #0 \n"
+        "bne main_loop \n"
 
-        // Update thread state to READY (0)
-        "mov r12, #0\n\t"        // READY state
-        "strb r12, [r3, #8]\n\t" // Store byte at thread state offset
+        // Sleep time is 0, update masks
+        "lsr r12, r12, #2 \n" // Convert back to bit index
+        "mov r3, #1 \n"
+        "lsl r3, r3, r12 \n" // Create bit mask (1 << index)
 
-        // Increment loop counter and continue
-        "next_iter:\n\t"
-        "add r2, #4\n\t" // Move to next thread pointer
-        "add r0, #1\n\t" // Increment counter
-        "b sleeping_threads_loop\n\t"
+        // Update ready_threads_bit_mask (volatile)
+        "ldr r12, [r2] \n"
+        "orr r12, r12, r3 \n"
+        "str r12, [r2] \n"
 
-        // Exit loop
-        "exit_loop:\n\t"
-        "b return_from_update"
-        :                                         // Output operands
-        :                                         // Input operands
-        : "r0", "r1", "r2", "r3", "r12", "memory" // Clobber list
-    );
-} */
+        // Update sleeping_threads_bit_mask (volatile)
+        "ldr r12, [r0] \n"
+        "bic r12, r12, r3 \n"
+        "str r12, [r0] \n"
+
+        "b main_loop \n"
+
+        "done: \n"
+        "b return_from_update \n");
+}
 
 /* A subtle problem is that the thread calling sleep gets context switched just before the call; this can lead to the thread waiting more than expected; fundamental flaw */
 __attribute__((naked)) void neo_thread_sleep(uint32_t time)
@@ -552,6 +540,8 @@ __attribute__((naked)) void neo_thread_sleep(uint32_t time)
     __asm__ volatile("cpsid i \n");
     // set the thread state to SLEEPING; everytime systick interrupt occurs, all threads that are SLEEPING have their sleep_time decremented by 1
     sleeping_threads_bit_mask |= 1U << curr_running_thread_index;
+    ready_threads_bit_mask &= ~(1U << curr_running_thread_index);
+    running_threads_bit_mask &= ~(1U << curr_running_thread_index);
     // set the sleep time of the thread
     thread_sleep_time[curr_running_thread_index] = time;
     // trigger context switch
