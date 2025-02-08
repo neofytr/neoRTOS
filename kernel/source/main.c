@@ -56,7 +56,7 @@ void thread_one_fxn(void *arg)
     bool block_once = true;
     while (true)
     {
-        if (has_time_passed(5, start)) 
+        if (has_time_passed(5, start))
         {
             start = get_tick_count();
             if (is_on)
@@ -89,7 +89,8 @@ int main(void)
     neo_thread_init(&thread_one, thread_one_fxn, NULL, (uint8_t *)thread_one_stack, 4 * 40);
     neo_thread_init(&thread_two, thread_two_fxn, NULL, (uint8_t *)thread_two_stack, 4 * 40);
 
-    neo_start_threads();
+    neo_thread_start(&thread_one);
+    neo_thread_start(&thread_two);
 
     while (1)
         ;

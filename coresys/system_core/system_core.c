@@ -55,25 +55,6 @@ __attribute__((naked)) void SysTick_handler(void)
     );
 }
 
-/* __attribute__((naked)) void SysTick_handler(void)
-{
-    // LR is loaded with EXC_RETURN upon exception entry; this must be popped into PC to return from exception properly
-    __asm__ volatile(
-        ".global is_first_time \n"
-        ".global exit_from_interrupt_ \n"
-        "cpsid i \n"
-        "ldr r0, =tick_count   \n" // Load address of tick_count
-        "ldr r1, [r0]          \n" // Load tick_count value
-        "add r1, r1, #1        \n" // Increment tick_count
-        "str r1, [r0]          \n" // Store updated value back
-        "cpsie i \n"
-        "b thread_handler      \n" // Branch with link to thread handler
-        "exit_from_interrupt_: \n"
-        "ldr lr, =0xFFFFFFF9 \n"
-        "bx lr                 \n" // Return from interrupt; stack must be the way it was before interrupt entry as setup by the CPU and LR should be loaded with appropriate EXC_RETURN value to return from exception
-    );
-} */
-
 /**
  * @brief Safely retrieve the current tick count
  *

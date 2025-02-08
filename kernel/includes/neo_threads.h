@@ -6,14 +6,17 @@
 #include "system_core.h"
 #include "core_cm4.h"
 
+/* if this goes beyond one byte it could cause a problem in the update sleeping threads function since it has hardcoded the size of this enum as 1 byte */
 typedef enum
 {
     READY = 0,
     RUNNING = 1,
     SLEEPING = 2,
     PAUSED = 3,
+    NEW = 5,
 } neo_thread_state_t;
 
+/* if the structure is ever changed, please update the requisite hardcoded values in the udpate sleeping threads function */
 typedef struct __attribute__((packed))
 {
     uint8_t *stack_ptr;
@@ -26,6 +29,7 @@ void neo_kernel_init(void);
 __attribute__((naked)) void neo_thread_sleep(uint32_t time);
 __attribute__((naked)) void neo_thread_pause(void);
 __attribute__((naked)) bool neo_thread_resume(neo_thread_t *thread);
-void neo_start_threads(void);
+__attribute__((naked)) bool neo_thread_start(neo_thread_t *thread);
+void neo_thread_start_all_new(void);
 
 #endif

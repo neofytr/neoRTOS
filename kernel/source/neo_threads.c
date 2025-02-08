@@ -333,7 +333,6 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
 
     // Add thread to queue
     thread_queue[thread_queue_len++] = thread;
-    __enable_irq();
 
     // Align stack pointer to 8-byte boundary (AAPCS requirement)
     thread->stack_ptr = (uint8_t *)(((uintptr_t)stack + stack_size) & ~(STACK_ALIGNMENT - 1));
@@ -368,19 +367,48 @@ bool neo_thread_init(neo_thread_t *thread, void (*thread_function)(void *),
     }
 
     thread->stack_ptr = (uint8_t *)ptr;
+    thread->thread_state = NEW;
+    __enable_irq(); // enable interrupts only after the thread has been initialized
     return true;
 }
 
 /**
- * @brief Start the thread system
- * Enables threading and sets up final configurations
+ * @brief Start a new thread
+ * Doesn't actually start the thread as in the thread starts executing; it just changes its state to READY
+ * The thread will start executing when it's scheduled
+ * @param thread Pointer to thread structure
+ * @return true if thread was started, false otherwise
  */
-void neo_start_threads(void)
+__attribute__((naked)) bool neo_thread_start(neo_thread_t *thread)
+{
+    __asm__ volatile("cpsid i \n");
+    has_threads_started = 1;
+    if (thread->thread_state == NEW)
+    {
+        thread->thread_state = READY;
+        __asm__ volatile("cpsie i \n"
+                         "mov r0, #1 \n" // return true if thread was new and we started it
+                         "bx lr \n");
+    }
+    __asm__ volatile("cpsie i \n"
+                     "mov r0, #0 \n" // return false otherwise since the thread was not new to begin with
+                     "bx lr \n");
+}
+
+/**
+ * @brief Start all new threads
+ * Changes the state of all new threads to READY
+ * Threads will start executing when they are scheduled
+ */
+void neo_thread_start_all_new(void)
 {
     __disable_irq();
     for (uint32_t index = 0; index < thread_queue_len; index++)
     {
-        thread_queue[index]->thread_state = READY;
+        if (thread_queue[index]->thread_state == NEW)
+        {
+            thread_queue[index]->thread_state = READY;
+        }
     }
     has_threads_started = 1;
     __enable_irq();
