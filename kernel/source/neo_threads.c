@@ -228,98 +228,80 @@ __attribute__((naked)) void neo_context_switch(void)
 }
 
 /**
- * @brief Thread scheduler implementation
- * Determines which thread should run next based on round-robin scheduling
+ * @brief Bare metal thread scheduler implementation
+ *
+ * This function implements a round-robin scheduler with support for thread states
+ * and idle thread handling. It runs with interrupts disabled and uses naked attribute
+ * to manage its own stack frame.
+ *
+ * Key Features:
+ * - Round-robin scheduling policy
+ * - Support for READY and RUNNING thread states
+ * - Idle thread fallback when no threads are ready
+ * - First-time initialization handling
+ *
+ * @note This function is marked as naked and should only be called from assembly
+ * @note Registers r4-r11 are already saved before entering this function
+ * @note Interrupts are disabled when entering this function
  */
 __attribute__((naked)) void neo_thread_scheduler(void)
 {
-    /* we have now saved the registers r4 to r11; we can clobber them */
-    /* interrupts are disabled before entering this function */
-    // Load thread_queue_len and check if empty
+    /* Fast path: handle empty queue case */
     if (!thread_queue_len)
     {
         goto enable_and_return;
     }
 
-    // Check first-time scheduling
-    if (!is_first_time)
+    /* Handle first-time scheduling initialization */
+    if (is_first_time)
     {
-        goto main_scheduling_logic;
-    }
-    else
-    {
-        // First time initialization
-        for (uint32_t index = 0; index < thread_queue_len; index++)
+        /* Find first ready thread or default to idle */
+        for (uint32_t i = 0; i < thread_queue_len; i++)
         {
-            if (thread_queue[index]->thread_state == READY)
+            if (thread_queue[i]->thread_state == READY)
             {
-                curr_running_thread_index = index;
-                goto enable_and_return; // run the first ready thread
+                curr_running_thread_index = i;
+                goto enable_and_return;
             }
         }
-
-        curr_running_thread_index = MAX_THREADS;
-        goto enable_and_return; // no ready threads found
+        curr_running_thread_index = MAX_THREADS; // No ready threads, run idle
+        goto enable_and_return;
     }
 
-main_scheduling_logic:
-    last_running_thread_index = curr_running_thread_index; // save the index of the thread that was previously running
+    /* Main scheduling logic */
+    last_running_thread_index = curr_running_thread_index;
 
-    /* scheduling logic goes here; set curr_running_thread_index here appropriately */
-
-    if (thread_queue[last_running_thread_index]->thread_state == RUNNING)
+    /* Update previous thread state if it was running */
+    if (last_running_thread_index != MAX_THREADS &&
+        thread_queue[last_running_thread_index]->thread_state == RUNNING)
     {
         thread_queue[last_running_thread_index]->thread_state = READY;
     }
 
-    if (last_running_thread_index == MAX_THREADS) // idle thread was running and now is preempted
+    /* Initialize search starting point */
+    uint32_t start = (last_running_thread_index == MAX_THREADS) ? 0 : (last_running_thread_index + 1) % thread_queue_len;
+    uint32_t current = start;
+
+    /* Search for next ready thread */
+    do
     {
-        for (uint32_t index = 0; index < thread_queue_len; index++)
+        if (thread_queue[current]->thread_state == READY)
         {
-            if (thread_queue[index]->thread_state == READY)
-            {
-                curr_running_thread_index = index;
-                goto enable_and_return;
-            }
-        }
-
-        curr_running_thread_index = MAX_THREADS;
-        goto enable_and_return; // still no ready threads found
-    }
-
-    uint32_t curr = curr_running_thread_index;
-
-    while (true)
-    {
-        curr_running_thread_index++;
-        if (curr_running_thread_index == MAX_THREADS)
-        {
-            curr_running_thread_index = 0;
-        }
-
-        if (curr_running_thread_index == thread_queue_len)
-        {
-            curr_running_thread_index = 0; // reached the end of the queue first time? go to start
-        }
-
-        if (curr_running_thread_index == curr)
-        {
-            curr_running_thread_index = MAX_THREADS; // no ready threads found; run idle thread
+            curr_running_thread_index = current;
             goto enable_and_return;
         }
+        current = (current + 1) % thread_queue_len;
+    } while (current != start);
 
-        if (thread_queue[curr_running_thread_index]->thread_state == READY)
-        {
-            goto enable_and_return;
-        }
-    }
-
-    // curr_running_thread_index = (curr_running_thread_index + 1) & (MAX_THREADS - 1); // round-robin scheduling
+    /* No ready threads found, switch to idle thread */
+    curr_running_thread_index = MAX_THREADS;
 
 enable_and_return:
+    /* Update thread state and timing information */
     thread_queue[curr_running_thread_index]->thread_state = RUNNING;
     last_thread_start_tick = tick_count;
 
+    /* Return to assembly context switch code */
     __asm__ volatile("b return_from_scheduler");
 }
 
