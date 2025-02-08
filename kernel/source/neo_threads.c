@@ -26,6 +26,7 @@
 #define PENDSV_IRQ_NUM (14U)     // PendSV interrupt number
 #define LOWEST_PRIORITY (0xFFU)  // Lowest interrupt priority for PendSV
 
+/* major mistake is including variables like these in header files and then including those header files in different source files; this confuses the compiler */
 extern volatile uint32_t tick_count;
 
 /* Thread Management State
