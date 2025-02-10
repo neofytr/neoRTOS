@@ -2,9 +2,10 @@
 #define NEO_ALLOC_H
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
-#define HEAP_SIZE 0x400 // 1KB Heap
-
+void neo_heap_init(void);
 void *neo_alloc(uint32_t size);
 void neo_free(void *ptr);
 
