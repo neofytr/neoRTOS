@@ -88,6 +88,24 @@ int main(void)
 
     ptr = neo_alloc(32);
     neo_free(ptr);
+    ptr = neo_alloc(16);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
+    ptr = neo_alloc(32);
+    neo_free(ptr);
 
     neo_thread_start(&thread_one);
     neo_thread_start(&thread_two);
