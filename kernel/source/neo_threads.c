@@ -1,4 +1,5 @@
 #include "neo_threads.h"
+#include "neo_alloc.h"
 
 /* TODO */
 // Somehow use PSP and MSP?
@@ -124,6 +125,9 @@ void neo_kernel_init(void)
 
     // Only now set the thread's stack pointer to the final position
     idle_thread.stack_ptr = (uint8_t *)ptr;
+
+    // initialize the heap
+    neo_heap_init();
     __enable_irq();
 }
 

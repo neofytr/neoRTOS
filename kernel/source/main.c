@@ -83,8 +83,6 @@ int main(void)
     neo_thread_init(&thread_one, thread_one_fxn, NULL, (uint8_t *)thread_one_stack, 4 * 40);
     neo_thread_init(&thread_two, thread_two_fxn, NULL, (uint8_t *)thread_two_stack, 4 * 40);
 
-    neo_heap_init();
-
     void *ptr = neo_alloc(16);
     neo_free(ptr);
 
