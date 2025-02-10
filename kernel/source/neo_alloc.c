@@ -27,6 +27,44 @@ static volatile uint8_t free_calls = 0;
 
 static void defragment(void)
 {
+    uint32_t curr_index = 0;
+    while (true)
+    {
+        if (!HEAP(curr_index))
+        {
+            // the current chunk is unallocated
+            uint32_t next_index = (curr_index) + 4 + *(uint16_t *)&HEAP(curr_index + 1);
+            if (next_index >= HEAP_SIZE)
+            {
+                // we've reached the end of the heap
+                break;
+            }
+
+            if (!HEAP(next_index))
+            {
+                // the next chunk is also unallocated
+                // coallesce the two chunks
+                *(uint16_t *)&HEAP(curr_index + 1) += 4 + *(uint16_t *)&HEAP(next_index + 1);
+                curr_index += 4 + *(uint16_t *)&HEAP(curr_index + 1);
+                if (curr_index >= HEAP_SIZE)
+                {
+                    // we've reached the end of the heap
+                    break;
+                }
+                continue;
+            }
+            else
+            {
+                // the next chunk is allocated
+                curr_index = next_index + 4 + *(uint16_t *)&HEAP(next_index + 1);
+                if (curr_index >= HEAP_SIZE)
+                {
+                    // we've reached the end of the heap
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void neo_heap_init(void)
