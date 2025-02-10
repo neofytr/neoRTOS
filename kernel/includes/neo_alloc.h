@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 void neo_heap_init(void);
-void *neo_alloc(uint32_t size);
+void *neo_alloc(uint16_t size);
 void neo_free(void *ptr);
 
 #endif // NEO_ALLOC_H

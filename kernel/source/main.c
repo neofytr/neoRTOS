@@ -4,6 +4,7 @@
 #include "core_cm4.h"
 #include "system_core.h"
 #include "neo_threads.h"
+#include "neo_alloc.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -81,6 +82,14 @@ int main(void)
 
     neo_thread_init(&thread_one, thread_one_fxn, NULL, (uint8_t *)thread_one_stack, 4 * 40);
     neo_thread_init(&thread_two, thread_two_fxn, NULL, (uint8_t *)thread_two_stack, 4 * 40);
+
+    neo_heap_init();
+
+    void *ptr = neo_alloc(16);
+    neo_free(ptr);
+
+    ptr = neo_alloc(32);
+    neo_free(ptr);
 
     neo_thread_start(&thread_one);
     neo_thread_start(&thread_two);

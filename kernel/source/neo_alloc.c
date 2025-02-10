@@ -1,7 +1,8 @@
 #include "neo_alloc.h"
 #include "core_cm4.h"
 
-extern uint32_t _heap_start;
+// Declare _heap_start as a pointer to the start of the heap region
+extern uint8_t _heap_start[];
 
 /**
  * Configuration constants for the heap allocator
@@ -21,35 +22,52 @@ typedef struct
     uint8_t allocated;
     uint16_t size;
     uint8_t padding;
-} ChunkHeader;
+} __attribute__((packed)) ChunkHeader; // Added packed attribute
 
-// Base pointer for the heap
-static uint8_t *const heap_base = (uint8_t *)&_heap_start;
+// Define heap bounds
+static uint8_t *const heap_start = &_heap_start[0];
+static uint8_t *const heap_end = &_heap_start[HEAP_SIZE];
+
 static volatile uint8_t free_calls = 0;
 
-// Helper macro to get chunk header at a given index
-#define GET_HEADER(index) ((ChunkHeader *)&heap_base[index])
+/**
+ * Helper function to validate a chunk header pointer
+ */
+static bool is_valid_header(const ChunkHeader *header)
+{
+    return ((uint8_t *)header >= heap_start &&
+            (uint8_t *)header + sizeof(ChunkHeader) <= heap_end);
+}
+
+/**
+ * Helper function to get chunk header at a given offset
+ */
+static ChunkHeader *get_header(size_t offset)
+{
+    if (offset >= HEAP_SIZE - sizeof(ChunkHeader))
+        return NULL;
+    return (ChunkHeader *)(heap_start + offset);
+}
 
 /**
  * Coalesces adjacent free chunks to reduce fragmentation.
- * This function is called automatically after DEFRAG_CUTOFF number of frees.
  */
 static void defragment(void)
 {
-    uint32_t curr_index = 0;
+    size_t curr_offset = 0;
 
-    while (curr_index < HEAP_SIZE)
+    while (curr_offset < HEAP_SIZE)
     {
-        ChunkHeader *curr = GET_HEADER(curr_index);
+        ChunkHeader *curr = get_header(curr_offset);
+        if (!curr)
+            break;
 
         if (!curr->allocated)
         {
-            uint32_t next_index = curr_index + sizeof(ChunkHeader) + curr->size;
-            if (next_index >= HEAP_SIZE)
-                break;
+            size_t next_offset = curr_offset + sizeof(ChunkHeader) + curr->size;
+            ChunkHeader *next = get_header(next_offset);
 
-            ChunkHeader *next = GET_HEADER(next_index);
-            if (!next->allocated)
+            if (next && !next->allocated)
             {
                 // Merge with next chunk
                 curr->size += sizeof(ChunkHeader) + next->size;
@@ -57,72 +75,71 @@ static void defragment(void)
             }
         }
 
-        curr_index += sizeof(ChunkHeader) + curr->size;
+        curr_offset += sizeof(ChunkHeader) + curr->size;
     }
 }
 
 /**
- * Initializes the heap by creating a single free chunk spanning the entire heap.
- * Must be called before any allocation operations.
+ * Initializes the heap
  */
 void neo_heap_init(void)
 {
     __disable_irq();
-    ChunkHeader *initial = GET_HEADER(0);
+    ChunkHeader *initial = (ChunkHeader *)heap_start;
     initial->allocated = 0;
     initial->size = HEAP_SIZE - sizeof(ChunkHeader);
+    initial->padding = 0;
     __enable_irq();
 }
 
 /**
- * Allocates a block of memory from the heap.
- *
- * @param size Requested size in bytes
- * @return Pointer to allocated memory, or NULL if allocation fails
- *
- * Features:
- * - 4-byte alignment guaranteed
- * - Split chunks when possible to reduce fragmentation
- * - Thread-safe through interrupt disabling
+ * Allocates memory from the heap
  */
 void *neo_alloc(uint16_t size)
 {
+    if (size == 0)
+        return NULL;
+
     __disable_irq();
 
     // Round size up to nearest multiple of 4 for alignment
     uint16_t aligned_size = (size + 3) & ~3;
-    if (aligned_size == 0)
-        aligned_size = 4;
 
-    uint32_t curr_index = 0;
-    while (curr_index < HEAP_SIZE)
+    size_t curr_offset = 0;
+    while (curr_offset < HEAP_SIZE)
     {
-        ChunkHeader *curr = GET_HEADER(curr_index);
+        ChunkHeader *curr = get_header(curr_offset);
+        if (!curr)
+            break;
 
         if (!curr->allocated && curr->size >= aligned_size)
         {
             // Check if chunk should be split
             if (curr->size >= aligned_size + sizeof(ChunkHeader) + SPLIT_CUTOFF)
             {
-                // Split chunk
-                ChunkHeader *new_chunk = GET_HEADER(curr_index + sizeof(ChunkHeader) + aligned_size);
-                new_chunk->allocated = 0;
-                new_chunk->size = curr->size - aligned_size - sizeof(ChunkHeader);
+                size_t new_offset = curr_offset + sizeof(ChunkHeader) + aligned_size;
+                ChunkHeader *new_chunk = get_header(new_offset);
 
-                curr->allocated = 1;
-                curr->size = aligned_size;
+                if (new_chunk)
+                {
+                    new_chunk->allocated = 0;
+                    new_chunk->size = curr->size - aligned_size - sizeof(ChunkHeader);
+                    new_chunk->padding = 0;
+
+                    curr->allocated = 1;
+                    curr->size = aligned_size;
+                }
             }
             else
             {
-                // Use entire chunk
                 curr->allocated = 1;
             }
 
             __enable_irq();
-            return (void *)&heap_base[curr_index + sizeof(ChunkHeader)];
+            return heap_start + curr_offset + sizeof(ChunkHeader);
         }
 
-        curr_index += sizeof(ChunkHeader) + curr->size;
+        curr_offset += sizeof(ChunkHeader) + curr->size;
     }
 
     __enable_irq();
@@ -130,28 +147,22 @@ void *neo_alloc(uint16_t size)
 }
 
 /**
- * Frees a previously allocated block of memory.
- *
- * @param ptr Pointer to memory block to free
- *
- * Features:
- * - Validates pointer before freeing
- * - Automatic defragmentation after DEFRAG_CUTOFF frees
- * - Thread-safe through interrupt disabling
+ * Frees allocated memory
  */
 void neo_free(void *ptr)
 {
     __disable_irq();
 
-    if (!ptr || (uint8_t *)ptr < heap_base || (uint8_t *)ptr >= heap_base + HEAP_SIZE)
+    if (!ptr || (uint8_t *)ptr < heap_start || (uint8_t *)ptr >= heap_end)
     {
         __enable_irq();
         return;
     }
 
-    ChunkHeader *header = GET_HEADER(((uint8_t *)ptr - heap_base) - sizeof(ChunkHeader));
+    // Get header pointer by subtracting header size from data pointer
+    ChunkHeader *header = (ChunkHeader *)((uint8_t *)ptr - sizeof(ChunkHeader));
 
-    if (!header->allocated)
+    if (!is_valid_header(header) || !header->allocated)
     {
         __enable_irq();
         return;
