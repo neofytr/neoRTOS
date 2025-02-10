@@ -10,6 +10,10 @@ extern uint32_t _heap_start;
 // the macro HEAP(index) is equivalent to neo_heap[index]
 // index must be strictly less than HEAP_SIZE and greater than or equal to 0
 #define HEAP(index) (((uint8_t *)&_heap_start)[(index)])
+#define DEFRAG_CUTOFF (10) // after every 10 free calls, defragment the heap
+
+static void defragment(void);
+static volatile uint8_t free_calls = 0;
 
 /* The allocations are in chunks of 4 bytes only; irrespective of the size of the allocation asked */
 
@@ -20,6 +24,10 @@ extern uint32_t _heap_start;
 // the first byte tells if the chunk is allocated or not (0 is for unallocated; 1 is for allocated)
 // the second and third byte tells the size of the chunk (in bytes) (not including the metadata)
 // the fourth byte is unused/padding
+
+static void defragment(void)
+{
+}
 
 void neo_heap_init(void)
 {
@@ -87,4 +95,48 @@ void *neo_alloc(uint16_t size)
     __enable_irq();
     return NULL;
     // it's now safe for a context switch to occur; enable interrupts
+}
+
+void free(void *ptr)
+{
+    // a context switch in between the neo_alloc function can cause the heap to be corrupted
+    // so disable interrupts before entering the main function code
+    __disable_irq();
+
+    if (!ptr)
+    {
+        __enable_irq();
+        return;
+    }
+
+    if ((uintptr_t)ptr < (uintptr_t)&_heap_start || (uintptr_t)ptr >= (uintptr_t)&_heap_start + HEAP_SIZE)
+    {
+        // the pointer is not within the heap
+        __enable_irq();
+        return;
+    }
+
+    uint32_t metadata_index = (uint32_t)ptr - (uint32_t)&_heap_start - 4;
+    if (!HEAP(metadata_index))
+    {
+        // the chunk is already unallocated
+        __enable_irq();
+        return;
+    }
+    else
+    {
+        // the chunk is allocated; unallocate it
+        HEAP(metadata_index) = 0;
+    }
+
+    free_calls++;
+    if (free_calls == DEFRAG_CUTOFF)
+    {
+        defragment();
+        free_calls = 0;
+    }
+
+    // it's now safe for a context switch to occur; enable interrupts
+    __enable_irq();
+    return;
 }
